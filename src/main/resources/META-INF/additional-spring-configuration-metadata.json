@@ -1,0 +1,37 @@
+{
+  "hints": [
+    {
+      "name": "chaos.scenarios.keys",
+      "values": [
+        { "value": "db-timeout",        "description": "Simulates a database timeout" },
+        { "value": "network-partition", "description": "Simulates a network partition" },
+        { "value": "flaky-service",     "description": "Simulates an intermittently failing downstream service" }
+      ]
+    }
+  ],
+  "properties": [
+    {
+      "name": "chaos.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Master switch for HavocFlow chaos injection. Must be true for any chaos to be applied. NEVER set to true in production."
+    },
+    {
+      "name": "chaos.dry-run",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "When true, the chaos engine logs what it would do but does not actually inject latency or exceptions."
+    },
+    {
+      "name": "chaos.default-failure-rate",
+      "type": "java.lang.Double",
+      "defaultValue": 0.0,
+      "description": "Default failure probability (0.0–1.0) applied when @InjectChaos does not specify failureRate."
+    },
+    {
+      "name": "chaos.scenarios",
+      "type": "java.util.Map<java.lang.String, io.havocflow.config.ChaosProperties.ScenarioProperties>",
+      "description": "Named chaos scenarios. Reference them with @InjectChaos(scenario = \"name\")."
+    }
+  ]
+}
