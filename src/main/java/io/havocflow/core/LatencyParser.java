@@ -54,8 +54,9 @@ public final class LatencyParser {
                 throw new IllegalArgumentException(
                     "Latency range lower bound must be <= upper bound: " + expr);
             }
-            // ThreadLocalRandom not available in all Java 8 contexts; plain Random is fine here
-            return low + (long) (RANDOM.nextDouble() * (high - low + 1));
+            // When low == high, (high - low) == 0, so nextDouble() * 0 == 0, returning exactly low.
+            // Using (high - low) instead of (high - low + 1) keeps the result strictly within [low, high].
+            return low + (long) (RANDOM.nextDouble() * (high - low));
         }
 
         Matcher single = SINGLE.matcher(expr);

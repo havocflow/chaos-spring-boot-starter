@@ -123,6 +123,42 @@ class ChaosEngineTest {
     }
 
     @Test
+    @DisplayName("overridable=true: inline failureRate overrides scenario failureRate")
+    void overridable_true_inlineOverridesScenario() {
+        ChaosProperties.ScenarioProperties scenario = new ChaosProperties.ScenarioProperties();
+        scenario.setLatency("1s");
+        scenario.setFailureRate(0.0); // scenario never fails
+        scenario.setException("java.lang.RuntimeException");
+        Map<String, ChaosProperties.ScenarioProperties> scenarios =
+                new HashMap<String, ChaosProperties.ScenarioProperties>();
+        scenarios.put("no-fail", scenario);
+        properties.setScenarios(scenarios);
+
+        // inline failureRate=1.0 with overridable=true should override scenario's 0.0
+        ChaosDecision decision = engine.decide(
+                chaosWithScenarioRateAndOverridable("no-fail", 1.0, true), "Svc#op");
+        assertThat(decision.shouldThrow()).isTrue();
+    }
+
+    @Test
+    @DisplayName("overridable=false: scenario failureRate is authoritative, inline is ignored")
+    void overridable_false_scenarioIsAuthoritative() {
+        ChaosProperties.ScenarioProperties scenario = new ChaosProperties.ScenarioProperties();
+        scenario.setLatency("1s");
+        scenario.setFailureRate(0.0); // scenario never fails
+        scenario.setException("java.lang.RuntimeException");
+        Map<String, ChaosProperties.ScenarioProperties> scenarios =
+                new HashMap<String, ChaosProperties.ScenarioProperties>();
+        scenarios.put("no-fail", scenario);
+        properties.setScenarios(scenarios);
+
+        // inline failureRate=1.0 with overridable=false should be ignored; scenario's 0.0 wins
+        ChaosDecision decision = engine.decide(
+                chaosWithScenarioRateAndOverridable("no-fail", 1.0, false), "Svc#op");
+        assertThat(decision.shouldThrow()).isFalse();
+    }
+
+    @Test
     @DisplayName("Dry-run returns NONE regardless of annotation params")
     void dryRun_returnsNone() {
         properties.setDryRun(true);
@@ -164,6 +200,18 @@ class ChaosEngineTest {
             public Class<? extends Throwable> exception() { return RuntimeException.class; }
             public String scenario()     { return scenario; }
             public boolean overridable() { return true; }
+        };
+    }
+
+    private InjectChaos chaosWithScenarioRateAndOverridable(
+            final String scenario, final double failureRate, final boolean overridable) {
+        return new InjectChaos() {
+            public Class<? extends Annotation> annotationType() { return InjectChaos.class; }
+            public String latency()      { return ""; }
+            public double failureRate()  { return failureRate; }
+            public Class<? extends Throwable> exception() { return RuntimeException.class; }
+            public String scenario()     { return scenario; }
+            public boolean overridable() { return overridable; }
         };
     }
 }

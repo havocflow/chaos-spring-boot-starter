@@ -49,6 +49,76 @@
       "name": "chaos.allowed-exception-classes",
       "type": "java.util.List<java.lang.String>",
       "description": "Optional allowlist of fully-qualified exception class names permitted for injection. When empty, any Throwable subclass is accepted."
+    },
+    {
+      "name": "chaos.log-gremlins",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "When true, logs a WARN message each time chaos is injected, including the method name and decision details."
+    },
+    {
+      "name": "chaos.event-store-capacity",
+      "type": "java.lang.Integer",
+      "defaultValue": 100,
+      "description": "Maximum number of chaos injection events stored in the in-memory ring buffer. Oldest events are discarded when capacity is exceeded."
+    },
+    {
+      "name": "chaos.http-fault.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Enable HTTP-layer fault injection via a servlet filter. Injects HTTP error responses and/or latency on matching requests."
+    },
+    {
+      "name": "chaos.http-fault.failure-rate",
+      "type": "java.lang.Double",
+      "defaultValue": 0.0,
+      "description": "Probability (0.0–1.0) that a matching HTTP request receives a fault response."
+    },
+    {
+      "name": "chaos.http-fault.http-status",
+      "type": "java.lang.Integer",
+      "defaultValue": 503,
+      "description": "HTTP status code returned when a fault is injected by the HTTP fault filter."
+    },
+    {
+      "name": "chaos.http-fault.latency",
+      "type": "java.lang.String",
+      "description": "Latency to inject before fault HTTP responses. Supports fixed values (e.g. '200ms', '1s') and jitter ranges (e.g. '100ms-500ms')."
+    },
+    {
+      "name": "chaos.http-fault.path-patterns",
+      "type": "java.util.List<java.lang.String>",
+      "description": "List of regex patterns for request URIs that the HTTP fault filter applies to. An empty list matches all paths."
+    },
+    {
+      "name": "chaos.gremlins.cpu-threads",
+      "type": "java.lang.Integer",
+      "defaultValue": 1,
+      "description": "Number of background threads to spin when a CPU stress gremlin fires. Capped at available processors."
+    },
+    {
+      "name": "chaos.gremlins.cpu-duration-millis",
+      "type": "java.lang.Long",
+      "defaultValue": 1000,
+      "description": "Duration in milliseconds for which CPU stress threads run. Hard-capped at 5000 ms."
+    },
+    {
+      "name": "chaos.gremlins.memory-allocation-mb",
+      "type": "java.lang.Integer",
+      "defaultValue": 32,
+      "description": "Megabytes of heap to allocate during a memory pressure gremlin. Hard-capped at 25% of JVM max heap."
+    },
+    {
+      "name": "chaos.gremlins.connection-count",
+      "type": "java.lang.Integer",
+      "defaultValue": 1,
+      "description": "Number of JDBC connections to borrow and hold during a connection pool exhaustion gremlin."
+    },
+    {
+      "name": "chaos.gremlins.connection-hold-millis",
+      "type": "java.lang.Long",
+      "defaultValue": 1000,
+      "description": "Duration in milliseconds to hold borrowed connections. Capped at min(5000, chaos.max-latency-millis). Connections are always released in a finally block."
     }
   ]
 }

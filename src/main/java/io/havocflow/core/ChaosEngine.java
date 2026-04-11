@@ -59,8 +59,10 @@ public class ChaosEngine {
         ChaosDecision decision;
 
         if (!chaos.scenario().trim().isEmpty()) {
-            // Pass inline failureRate so it can override the scenario's rate when explicitly set
-            decision = resolveFromScenario(chaos.scenario(), chaos.failureRate());
+            // When overridable=true, inline annotation values (latency, failureRate, exception)
+            // take precedence over the named scenario's values if they are explicitly set.
+            // When overridable=false, the named scenario is authoritative and inline values are ignored.
+            decision = resolveFromScenario(chaos.scenario(), chaos.overridable() ? chaos : null);
         } else {
             decision = resolveFromAnnotation(chaos);
         }
@@ -78,10 +80,12 @@ public class ChaosEngine {
     // -----------------------------------------------------------------------
 
     /**
-     * @param inlineFailureRate the failureRate from the annotation; when &gt; 0 it overrides the
-     *                          scenario's own failureRate, allowing per-call fine-tuning.
+     * @param scenarioName  the name of the scenario to resolve
+     * @param inlineOverride when non-null (overridable=true), inline annotation values may override
+     *                       the scenario's own values if they are explicitly set.
+     *                       When null (overridable=false), the scenario is authoritative.
      */
-    private ChaosDecision resolveFromScenario(String scenarioName, double inlineFailureRate) {
+    private ChaosDecision resolveFromScenario(String scenarioName, InjectChaos inlineOverride) {
         ChaosProperties.ScenarioProperties scenario = properties.getScenarios().get(scenarioName);
         if (scenario == null) {
             log.warn("[HavocFlow] Unknown scenario '{}' — no chaos injected. "
@@ -90,14 +94,31 @@ public class ChaosEngine {
             return ChaosDecision.none();
         }
 
-        long latencyMillis = capLatency(LatencyParser.parseMillis(scenario.getLatency()));
-        double rate = inlineFailureRate > 0 ? inlineFailureRate : scenario.getFailureRate();
+        // Inline latency overrides scenario latency only when overridable=true and explicitly set
+        String latencyExpr = (inlineOverride != null && !inlineOverride.latency().trim().isEmpty())
+                ? inlineOverride.latency()
+                : scenario.getLatency();
+        long latencyMillis = capLatency(LatencyParser.parseMillis(latencyExpr));
+
+        // Inline failureRate overrides scenario failureRate only when overridable=true and > 0
+        double rate = (inlineOverride != null && inlineOverride.failureRate() > 0)
+                ? inlineOverride.failureRate()
+                : scenario.getFailureRate();
         boolean shouldFail = random.nextDouble() < rate;
 
+        // Inline exception overrides scenario exception only when overridable=true and not the default
+        Class<? extends Throwable> exType = null;
+        if (shouldFail) {
+            boolean inlineExceptionSet = inlineOverride != null
+                    && inlineOverride.exception() != RuntimeException.class;
+            if (inlineExceptionSet) {
+                exType = inlineOverride.exception();
+            } else {
+                exType = loadExceptionClass(scenario.getException());
+            }
+        }
+
         FailureMode mode = determineMode(latencyMillis, shouldFail);
-        Class<? extends Throwable> exType = shouldFail
-                ? loadExceptionClass(scenario.getException())
-                : null;
 
         return ChaosDecision.builder()
                 .mode(mode)
