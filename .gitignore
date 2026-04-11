@@ -6,3 +6,16 @@ target/
 *.class
 *.jar
 *.log
+
+# AI / IDE tool configurations — do not publish
+.claude/
+.continue/
+.cursor/
+.code-review-graph/
+.mcp.json
+.opencode.json
+.cursorrules
+.windsurfrules
+CLAUDE.md
+AGENTS.md
+GEMINI.md
