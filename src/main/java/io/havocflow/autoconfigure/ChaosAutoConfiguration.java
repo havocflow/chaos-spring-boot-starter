@@ -1,8 +1,15 @@
 package io.havocflow.autoconfigure;
 
+import io.havocflow.actuator.ChaosEndpoint;
 import io.havocflow.aop.ChaosAspect;
 import io.havocflow.core.ChaosEngine;
+import io.havocflow.event.ChaosEventStore;
+import io.havocflow.gremlins.ConnectionPoolExhaustionStrategy;
+import io.havocflow.gremlins.CpuStressStrategy;
+import io.havocflow.gremlins.MemoryPressureStrategy;
 import io.havocflow.metrics.ChaosMetricsRecorder;
+import io.havocflow.spi.ChaosStrategy;
+import io.havocflow.web.ChaosHttpFaultFilter;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,11 +17,16 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.EnableAspectJAutoProxy;
+import org.springframework.core.Ordered;
 
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -56,8 +68,27 @@ public class ChaosAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     public ChaosEngine chaosEngine(ChaosProperties properties) {
-        log.info("[HavocFlow] ChaosEngine initialized — gremlins are ready.");
+        logStartupBanner(properties);
         return new ChaosEngine(properties);
+    }
+
+    private void logStartupBanner(ChaosProperties props) {
+        log.info("[HavocFlow] ============= HavocFlow Chaos Engineering Starter =============");
+        log.info("[HavocFlow] Status        : ACTIVE (chaos.enabled=true)");
+        log.info("[HavocFlow] Dry-Run       : {}", props.isDryRun());
+        log.info("[HavocFlow] Default Rate  : {}", props.getDefaultFailureRate());
+        log.info("[HavocFlow] Max Latency   : {}ms", props.getMaxLatencyMillis());
+        log.info("[HavocFlow] Log Gremlins  : {}", props.isLogGremlins());
+        log.info("[HavocFlow] Forbidden Profiles: {}", props.getForbiddenProfiles());
+        if (props.getScenarios().isEmpty()) {
+            log.info("[HavocFlow] Scenarios     : (none configured)");
+        } else {
+            props.getScenarios().forEach((name, s) ->
+                log.info("[HavocFlow] Scenario      : name={} latency={} rate={} exception={}",
+                    name, s.getLatency(), s.getFailureRate(), s.getException()));
+        }
+        log.warn("[HavocFlow] WARNING: Chaos injection is ACTIVE. Do NOT deploy in production.");
+        log.info("[HavocFlow] =================================================================");
     }
 
     /**
@@ -76,18 +107,106 @@ public class ChaosAutoConfiguration {
     }
 
     /**
+     * Registers the in-memory event store for chaos injection history.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    public ChaosEventStore chaosEventStore(ChaosProperties properties) {
+        log.info("[HavocFlow] ChaosEventStore initialized with capacity={}",
+            properties.getEventStoreCapacity());
+        return new ChaosEventStore(properties.getEventStoreCapacity());
+    }
+
+    /**
+     * Registers the {@code /actuator/chaos} endpoint when Spring Boot Actuator is present.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(name = "org.springframework.boot.actuate.endpoint.annotation.Endpoint")
+    public ChaosEndpoint chaosEndpoint(ChaosProperties properties, ChaosEventStore eventStore) {
+        log.info("[HavocFlow] Actuator endpoint registered at /actuator/chaos");
+        return new ChaosEndpoint(properties, eventStore);
+    }
+
+    /**
+     * Registers the HTTP fault injection filter when running in a web application.
+     * Only active when {@code chaos.http-fault.enabled=true}.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnWebApplication
+    @ConditionalOnClass(name = "org.springframework.web.filter.GenericFilterBean")
+    public FilterRegistrationBean<ChaosHttpFaultFilter> chaosHttpFaultFilter(ChaosProperties properties) {
+        ChaosHttpFaultFilter filter = new ChaosHttpFaultFilter(properties);
+        FilterRegistrationBean<ChaosHttpFaultFilter> registration =
+            new FilterRegistrationBean<ChaosHttpFaultFilter>(filter);
+        registration.setOrder(Ordered.LOWEST_PRECEDENCE - 10);
+        registration.addUrlPatterns("/*");
+        log.info("[HavocFlow] HTTP fault filter registered (active when chaos.http-fault.enabled=true)");
+        return registration;
+    }
+
+    /**
      * Registers the AOP aspect that intercepts {@code @InjectChaos}-annotated methods.
      *
      * @param engine          the decision engine
      * @param properties      the HavocFlow configuration
      * @param metricsRecorder optional Micrometer recorder
+     * @param eventStore      event store for injection history
+     * @param strategies      optional list of {@link ChaosStrategy} plugins
      * @return the aspect instance
      */
     @Bean
     @ConditionalOnMissingBean
     public ChaosAspect chaosAspect(ChaosEngine engine,
                                    ChaosProperties properties,
-                                   Optional<ChaosMetricsRecorder> metricsRecorder) {
-        return new ChaosAspect(engine, properties, metricsRecorder);
+                                   Optional<ChaosMetricsRecorder> metricsRecorder,
+                                   ChaosEventStore eventStore,
+                                   List<ChaosStrategy> strategies) {
+        return new ChaosAspect(engine, properties, metricsRecorder, eventStore,
+            strategies != null ? strategies : Collections.<ChaosStrategy>emptyList());
+    }
+
+    // -----------------------------------------------------------------------
+    // Built-in gremlin ChaosStrategy beans (Phase 3)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Registers the CPU stress gremlin strategy.
+     */
+    @Bean
+    @ConditionalOnMissingBean(CpuStressStrategy.class)
+    public CpuStressStrategy cpuStressStrategy(ChaosProperties properties) {
+        ChaosProperties.GremlinProperties g = properties.getGremlins();
+        return new CpuStressStrategy(g.getCpuThreads(), g.getCpuDurationMillis());
+    }
+
+    /**
+     * Registers the memory pressure gremlin strategy.
+     */
+    @Bean
+    @ConditionalOnMissingBean(MemoryPressureStrategy.class)
+    public MemoryPressureStrategy memoryPressureStrategy(ChaosProperties properties) {
+        return new MemoryPressureStrategy(properties.getGremlins().getMemoryAllocationMb());
+    }
+
+    /**
+     * Registers the connection pool exhaustion gremlin strategy.
+     * Only active when a {@link javax.sql.DataSource} bean is present.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ConnectionPoolExhaustionStrategy.class)
+    @ConditionalOnBean(name = "dataSource")
+    @ConditionalOnClass(name = "javax.sql.DataSource")
+    public ConnectionPoolExhaustionStrategy connectionPoolExhaustionStrategy(
+            ChaosProperties properties,
+            javax.sql.DataSource dataSource) {
+        ChaosProperties.GremlinProperties g = properties.getGremlins();
+        return new ConnectionPoolExhaustionStrategy(
+            dataSource,
+            g.getConnectionCount(),
+            g.getConnectionHoldMillis(),
+            properties.getMaxLatencyMillis()
+        );
     }
 }

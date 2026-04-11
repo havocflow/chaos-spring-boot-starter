@@ -90,7 +90,7 @@ public class ChaosEngine {
             return ChaosDecision.none();
         }
 
-        long latencyMillis = LatencyParser.parseMillis(scenario.getLatency());
+        long latencyMillis = capLatency(LatencyParser.parseMillis(scenario.getLatency()));
         double rate = inlineFailureRate > 0 ? inlineFailureRate : scenario.getFailureRate();
         boolean shouldFail = random.nextDouble() < rate;
 
@@ -108,9 +108,14 @@ public class ChaosEngine {
     }
 
     private ChaosDecision resolveFromAnnotation(InjectChaos chaos) {
-        long latencyMillis = LatencyParser.parseMillis(chaos.latency());
-        double rate = chaos.failureRate() > 0
-                ? chaos.failureRate()
+        long latencyMillis = capLatency(LatencyParser.parseMillis(chaos.latency()));
+        double rawRate = chaos.failureRate();
+        if (rawRate < 0.0 || rawRate > 1.0) {
+            log.warn("[HavocFlow] @InjectChaos failureRate={} is out of range [0.0,1.0] — clamped", rawRate);
+            rawRate = Math.min(1.0, Math.max(0.0, rawRate));
+        }
+        double rate = rawRate > 0
+                ? rawRate
                 : properties.getDefaultFailureRate();
         boolean shouldFail = rate > 0 && random.nextDouble() < rate;
 
@@ -132,13 +137,47 @@ public class ChaosEngine {
         return FailureMode.NONE;
     }
 
+    private long capLatency(long rawMillis) {
+        long cap = properties.getMaxLatencyMillis();
+        if (rawMillis > cap) {
+            log.warn("[HavocFlow] Latency {}ms exceeds cap of {}ms — clamped to cap", rawMillis, cap);
+            return cap;
+        }
+        return rawMillis;
+    }
+
     @SuppressWarnings("unchecked")
     private Class<? extends Throwable> loadExceptionClass(String className) {
+        // Deny-list: reject class names that could have dangerous constructor side effects
+        if (isDangerousClass(className)) {
+            log.warn("[HavocFlow] Exception class '{}' is potentially dangerous — using RuntimeException", className);
+            return RuntimeException.class;
+        }
+
+        // Allowlist check: if configured, only permit listed classes
+        java.util.List<String> allowlist = properties.getAllowedExceptionClasses();
+        if (!allowlist.isEmpty() && !allowlist.contains(className)) {
+            log.warn("[HavocFlow] Exception class '{}' is not in the allowed-exception-classes list — using RuntimeException", className);
+            return RuntimeException.class;
+        }
+
         try {
-            return (Class<? extends Throwable>) Class.forName(className);
+            Class<?> clazz = Class.forName(className);
+            if (!Throwable.class.isAssignableFrom(clazz)) {
+                log.warn("[HavocFlow] '{}' does not extend Throwable — using RuntimeException", className);
+                return RuntimeException.class;
+            }
+            return (Class<? extends Throwable>) clazz;
         } catch (ClassNotFoundException e) {
             log.warn("[HavocFlow] Exception class '{}' not found — using RuntimeException", className);
             return RuntimeException.class;
         }
+    }
+
+    private boolean isDangerousClass(String className) {
+        return className.contains("System")
+            || className.contains("Runtime")
+            || className.contains("ProcessBuilder")
+            || className.contains("Shutdown");
     }
 }

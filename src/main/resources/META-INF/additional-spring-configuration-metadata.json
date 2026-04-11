@@ -32,6 +32,23 @@
       "name": "chaos.scenarios",
       "type": "java.util.Map<java.lang.String, io.havocflow.autoconfigure.ChaosProperties.ScenarioProperties>",
       "description": "Named chaos scenarios. Reference them with @InjectChaos(scenario = \"name\")."
+    },
+    {
+      "name": "chaos.max-latency-millis",
+      "type": "java.lang.Long",
+      "defaultValue": 30000,
+      "description": "Hard upper bound on injected latency in milliseconds. Prevents thread-pool starvation from misconfigured values. Default: 30000 (30s)."
+    },
+    {
+      "name": "chaos.forbidden-profiles",
+      "type": "java.lang.String",
+      "defaultValue": "prod,production,live",
+      "description": "Comma-separated Spring profile names where chaos.enabled=true is forbidden. Throws IllegalStateException on startup if violated."
+    },
+    {
+      "name": "chaos.allowed-exception-classes",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Optional allowlist of fully-qualified exception class names permitted for injection. When empty, any Throwable subclass is accepted."
     }
   ]
 }

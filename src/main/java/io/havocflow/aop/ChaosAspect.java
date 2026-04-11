@@ -5,7 +5,9 @@ import io.havocflow.autoconfigure.ChaosProperties;
 import io.havocflow.core.ChaosDecision;
 import io.havocflow.core.ChaosEngine;
 import io.havocflow.core.FailureMode;
+import io.havocflow.event.ChaosEventStore;
 import io.havocflow.metrics.ChaosMetricsRecorder;
+import io.havocflow.spi.ChaosStrategy;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
@@ -14,6 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -34,6 +38,8 @@ public class ChaosAspect {
     private final ChaosEngine engine;
     private final ChaosProperties properties;
     private final Optional<ChaosMetricsRecorder> metricsRecorder;
+    private final Optional<ChaosEventStore> eventStore;
+    private final List<ChaosStrategy> strategies;
 
     /**
      * Constructs a {@code ChaosAspect}.
@@ -41,13 +47,19 @@ public class ChaosAspect {
      * @param engine          the decision engine; must not be {@code null}
      * @param properties      the HavocFlow configuration; must not be {@code null}
      * @param metricsRecorder optional Micrometer recorder; empty when Micrometer is not on the classpath
+     * @param eventStore      event store for injection history
+     * @param strategies      list of registered {@link ChaosStrategy} plugins; may be empty
      */
     public ChaosAspect(ChaosEngine engine,
                        ChaosProperties properties,
-                       Optional<ChaosMetricsRecorder> metricsRecorder) {
+                       Optional<ChaosMetricsRecorder> metricsRecorder,
+                       ChaosEventStore eventStore,
+                       List<ChaosStrategy> strategies) {
         this.engine = engine;
         this.properties = properties;
         this.metricsRecorder = metricsRecorder;
+        this.eventStore = Optional.ofNullable(eventStore);
+        this.strategies = strategies != null ? strategies : Collections.<ChaosStrategy>emptyList();
     }
 
     /**
@@ -85,6 +97,7 @@ public class ChaosAspect {
         // Record the event before executing so metrics are captured even if
         // the downstream method itself throws.
         metricsRecorder.ifPresent(r -> r.recordGremlin(methodName, decision));
+        eventStore.ifPresent(s -> s.record(methodName, decision));
 
         if (properties.isLogGremlins()) {
             log.warn("[HavocFlow] Gremlin fired — method={} mode={} scenario={} latency={}ms",
@@ -102,7 +115,16 @@ public class ChaosAspect {
             throw buildException(decision.getExceptionType(), methodName, decision.getScenarioName());
         }
 
-        // 3. Proceed normally (mode was LATENCY only)
+        // 3. Delegate to a registered ChaosStrategy plugin if one matches
+        for (ChaosStrategy strategy : strategies) {
+            if (strategy.canHandle(decision)) {
+                log.warn("[HavocFlow] Delegating to strategy '{}' for method={}",
+                    strategy.name(), methodName);
+                return strategy.apply(pjp, decision);
+            }
+        }
+
+        // 4. Proceed normally (mode was LATENCY only, or no matching strategy)
         return pjp.proceed();
     }
 
