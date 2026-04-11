@@ -30,7 +30,7 @@
     },
     {
       "name": "chaos.scenarios",
-      "type": "java.util.Map<java.lang.String, io.havocflow.config.ChaosProperties.ScenarioProperties>",
+      "type": "java.util.Map<java.lang.String, io.havocflow.autoconfigure.ChaosProperties.ScenarioProperties>",
       "description": "Named chaos scenarios. Reference them with @InjectChaos(scenario = \"name\")."
     }
   ]

@@ -1,0 +1,3 @@
+# Spring Boot 2.x auto-configuration registration
+org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  io.havocflow.autoconfigure.ChaosAutoConfiguration

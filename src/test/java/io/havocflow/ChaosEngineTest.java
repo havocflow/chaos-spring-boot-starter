@@ -1,16 +1,17 @@
 package io.havocflow;
 
 import io.havocflow.annotation.InjectChaos;
-import io.havocflow.config.ChaosProperties;
-import io.havocflow.engine.ChaosDecision;
-import io.havocflow.engine.ChaosEngine;
-import io.havocflow.engine.FailureMode;
+import io.havocflow.autoconfigure.ChaosProperties;
+import io.havocflow.core.ChaosDecision;
+import io.havocflow.core.ChaosEngine;
+import io.havocflow.core.FailureMode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.RepeatedTest;
 import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Annotation;
+import java.util.HashMap;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -70,7 +71,10 @@ class ChaosEngineTest {
         scenario.setLatency("2s");
         scenario.setFailureRate(1.0);
         scenario.setException("java.lang.IllegalStateException");
-        properties.setScenarios(Map.of("db-timeout", scenario));
+        Map<String, ChaosProperties.ScenarioProperties> scenarios =
+                new HashMap<String, ChaosProperties.ScenarioProperties>();
+        scenarios.put("db-timeout", scenario);
+        properties.setScenarios(scenarios);
 
         ChaosDecision decision = engine.decide(chaosWithScenario("db-timeout"), "Svc#op");
         assertThat(decision.getMode()).isEqualTo(FailureMode.LATENCY_AND_EXCEPTION);
@@ -92,7 +96,10 @@ class ChaosEngineTest {
         ChaosProperties.ScenarioProperties scenario = new ChaosProperties.ScenarioProperties();
         scenario.setLatency("5s");
         scenario.setFailureRate(0.5);
-        properties.setScenarios(Map.of("slow", scenario));
+        Map<String, ChaosProperties.ScenarioProperties> scenarios =
+                new HashMap<String, ChaosProperties.ScenarioProperties>();
+        scenarios.put("slow", scenario);
+        properties.setScenarios(scenarios);
 
         // Inline failureRate=1.0 should override scenario's 0.5
         ChaosDecision decision = engine.decide(
@@ -127,7 +134,7 @@ class ChaosEngineTest {
     // Annotation builder helpers
     // -------------------------------------------------------------------------
 
-    private InjectChaos chaos(String latency, double failureRate) {
+    private InjectChaos chaos(final String latency, final double failureRate) {
         return new InjectChaos() {
             public Class<? extends Annotation> annotationType() { return InjectChaos.class; }
             public String latency()      { return latency; }
@@ -138,7 +145,7 @@ class ChaosEngineTest {
         };
     }
 
-    private InjectChaos chaosWithScenario(String scenario) {
+    private InjectChaos chaosWithScenario(final String scenario) {
         return new InjectChaos() {
             public Class<? extends Annotation> annotationType() { return InjectChaos.class; }
             public String latency()      { return ""; }
@@ -149,7 +156,7 @@ class ChaosEngineTest {
         };
     }
 
-    private InjectChaos chaosWithScenarioAndRate(String scenario, double failureRate) {
+    private InjectChaos chaosWithScenarioAndRate(final String scenario, final double failureRate) {
         return new InjectChaos() {
             public Class<? extends Annotation> annotationType() { return InjectChaos.class; }
             public String latency()      { return ""; }

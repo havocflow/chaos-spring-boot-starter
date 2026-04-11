@@ -1,17 +1,17 @@
-package io.havocflow.aspect;
+package io.havocflow.aop;
 
 import io.havocflow.annotation.InjectChaos;
-import io.havocflow.config.ChaosProperties;
-import io.havocflow.engine.ChaosDecision;
-import io.havocflow.engine.ChaosEngine;
-import io.havocflow.engine.FailureMode;
+import io.havocflow.autoconfigure.ChaosProperties;
+import io.havocflow.core.ChaosDecision;
+import io.havocflow.core.ChaosEngine;
+import io.havocflow.core.FailureMode;
 import io.havocflow.metrics.ChaosMetricsRecorder;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
 import java.util.Optional;
@@ -26,17 +26,32 @@ import java.util.Optional;
  * <p>This aspect is only registered when {@code chaos.enabled=true}.
  * It is never present in a production Spring context.
  */
-@Slf4j
 @Aspect
-@RequiredArgsConstructor
 public class ChaosAspect {
+
+    private static final Logger log = LoggerFactory.getLogger(ChaosAspect.class);
 
     private final ChaosEngine engine;
     private final ChaosProperties properties;
     private final Optional<ChaosMetricsRecorder> metricsRecorder;
 
     /**
-     * Intercepts methods annotated with @InjectChaos directly.
+     * Constructs a {@code ChaosAspect}.
+     *
+     * @param engine          the decision engine; must not be {@code null}
+     * @param properties      the HavocFlow configuration; must not be {@code null}
+     * @param metricsRecorder optional Micrometer recorder; empty when Micrometer is not on the classpath
+     */
+    public ChaosAspect(ChaosEngine engine,
+                       ChaosProperties properties,
+                       Optional<ChaosMetricsRecorder> metricsRecorder) {
+        this.engine = engine;
+        this.properties = properties;
+        this.metricsRecorder = metricsRecorder;
+    }
+
+    /**
+     * Intercepts methods annotated with {@code @InjectChaos} directly.
      */
     @Around("@annotation(chaos)")
     public Object aroundAnnotatedMethod(ProceedingJoinPoint pjp, InjectChaos chaos)
@@ -45,8 +60,9 @@ public class ChaosAspect {
     }
 
     /**
-     * Intercepts all methods on a class annotated with @InjectChaos,
-     * unless the method has its own @InjectChaos (handled above).
+     * Intercepts all methods on a class annotated with {@code @InjectChaos},
+     * unless the method has its own {@code @InjectChaos} (handled by
+     * {@link #aroundAnnotatedMethod}).
      */
     @Around("@within(chaos) && !@annotation(io.havocflow.annotation.InjectChaos)")
     public Object aroundAnnotatedClass(ProceedingJoinPoint pjp, InjectChaos chaos)
@@ -60,29 +76,30 @@ public class ChaosAspect {
 
     private Object applyChaos(ProceedingJoinPoint pjp, InjectChaos chaos) throws Throwable {
         String methodName = resolveMethodName(pjp);
-        ChaosDecision decision = engine.resolve(chaos);
+        ChaosDecision decision = engine.decide(chaos, methodName);
 
         if (decision.getMode() == FailureMode.NONE) {
             return pjp.proceed();
         }
 
         // Record the event before executing so metrics are captured even if
-        // the downstream method itself throws
+        // the downstream method itself throws.
         metricsRecorder.ifPresent(r -> r.recordGremlin(methodName, decision));
 
         if (properties.isLogGremlins()) {
             log.warn("[HavocFlow] Gremlin fired — method={} mode={} scenario={} latency={}ms",
-                    methodName, decision.getMode(), decision.getScenarioLabel(), decision.getLatencyMs());
+                    methodName, decision.getMode(), decision.getScenarioName(),
+                    decision.getLatencyMillis());
         }
 
         // 1. Inject latency
-        if (decision.getLatencyMs() > 0) {
-            Thread.sleep(decision.getLatencyMs());
+        if (decision.getLatencyMillis() > 0) {
+            Thread.sleep(decision.getLatencyMillis());
         }
 
-        // 2. Throw exception (if mode is EXCEPTION or BOTH)
-        if (decision.getMode() == FailureMode.EXCEPTION || decision.getMode() == FailureMode.BOTH) {
-            throw buildException(decision.getExceptionClass(), methodName, decision.getScenarioLabel());
+        // 2. Throw exception (if mode is EXCEPTION or LATENCY_AND_EXCEPTION)
+        if (decision.shouldThrow()) {
+            throw buildException(decision.getExceptionType(), methodName, decision.getScenarioName());
         }
 
         // 3. Proceed normally (mode was LATENCY only)
@@ -90,19 +107,18 @@ public class ChaosAspect {
     }
 
     private Throwable buildException(Class<? extends Throwable> exClass,
-                                      String method, String scenario) {
+                                     String method, String scenario) {
         String message = String.format(
                 "[HavocFlow] Chaos exception injected on %s (scenario: %s)", method, scenario);
         try {
-            // Try String constructor first
             Constructor<? extends Throwable> ctor = exClass.getConstructor(String.class);
             return ctor.newInstance(message);
         } catch (NoSuchMethodException e) {
-            // Fall back to no-arg constructor
             try {
                 return exClass.getDeclaredConstructor().newInstance();
             } catch (Exception ex) {
-                log.warn("[HavocFlow] Could not instantiate {}, using RuntimeException", exClass.getName());
+                log.warn("[HavocFlow] Could not instantiate {}, using RuntimeException",
+                        exClass.getName());
                 return new RuntimeException(message);
             }
         } catch (Exception e) {

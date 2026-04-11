@@ -1,6 +1,6 @@
 package io.havocflow;
 
-import io.havocflow.engine.LatencyParser;
+import io.havocflow.core.LatencyParser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

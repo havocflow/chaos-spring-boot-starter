@@ -1,19 +1,22 @@
 package io.havocflow;
 
 import io.havocflow.annotation.InjectChaos;
-import io.havocflow.config.ChaosAutoConfiguration;
-import io.havocflow.config.ChaosProperties;
+import io.havocflow.autoconfigure.ChaosAutoConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.stereotype.Service;
 import org.springframework.test.context.TestPropertySource;
 
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThatCode;
 
+/**
+ * Verifies that dry-run mode suppresses all chaos — no exceptions thrown,
+ * no latency injected — even when {@code failureRate=1.0}.
+ */
 @SpringBootTest(classes = {
     ChaosAspectDryRunTest.TestConfig.class,
     ChaosAutoConfiguration.class
@@ -42,9 +45,9 @@ class ChaosAspectDryRunTest {
         public void doWork() { /* real logic */ }
     }
 
-    @Configuration
+    @SpringBootConfiguration
     static class TestConfig {
-        @Bean SomeService someService()         { return new SomeService(); }
-        @Bean ChaosProperties chaosProperties() { return new ChaosProperties(); }
+        @Bean
+        SomeService someService() { return new SomeService(); }
     }
 }

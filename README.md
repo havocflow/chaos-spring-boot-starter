@@ -45,6 +45,7 @@ chaos:
   enabled: true
   dry-run: false
   default-failure-rate: 0.05
+  log-gremlins: true
 
   scenarios:
     db-timeout:
@@ -67,7 +68,7 @@ chaos:
 @InjectChaos(scenario = "db-timeout")
 public Product findById(Long id) { ... }
 
-// Inline — 2s latency + 10% failure rate
+// Inline — 2 s latency + 10 % failure rate
 @InjectChaos(latency = "2s", failureRate = 0.1)
 public void sendPayment(PaymentRequest req) { ... }
 
@@ -88,39 +89,41 @@ public class NotificationService { ... }
 | Attribute     | Type    | Default            | Description                                       |
 |---------------|---------|--------------------|---------------------------------------------------|
 | `latency`     | String  | `""` (none)        | Artificial delay. Supports fixed and jitter range |
-| `failureRate` | double  | `0.0`              | Probability of throwing an exception (0.0–1.0)   |
+| `failureRate` | double  | `0.0`              | Probability of throwing an exception (0.0–1.0)    |
 | `exception`   | Class   | `RuntimeException` | Exception type to throw on failure                |
 | `scenario`    | String  | `""` (none)        | Named preset from `chaos.scenarios.*`             |
 | `overridable` | boolean | `true`             | Allow runtime property overrides                  |
 
 ### Latency format
 
-| Expression   | Result                         |
-|--------------|--------------------------------|
-| `"500ms"`    | Fixed 500 milliseconds         |
-| `"2s"`       | Fixed 2 seconds                |
-| `"100ms-2s"` | Random between 100ms and 2000ms|
-| `"1s-5s"`    | Random between 1s and 5s      |
+| Expression     | Result                           |
+|----------------|----------------------------------|
+| `"500ms"`      | Fixed 500 milliseconds           |
+| `"2s"`         | Fixed 2 seconds                  |
+| `"1m"`         | Fixed 1 minute                   |
+| `"100ms-2s"`   | Random between 100 ms and 2 000 ms |
+| `"1s-5s"`      | Random between 1 s and 5 s       |
 
 ---
 
 ## Resolution order
 
 ```
-Annotation attribute  ->  Named scenario  ->  Global default
-     (highest)                                   (lowest)
+Named scenario  →  Inline annotation attributes  →  Global default-failure-rate
+  (highest)                                               (lowest)
 ```
 
 ---
 
 ## Dry-run mode
 
-Set `chaos.dry-run=true` to see what chaos would fire without applying it:
+Set `chaos.dry-run=true` to see what chaos would fire without applying it.
+Useful for CI environments or initial rollouts:
 
 ```
 [HavocFlow][DRY-RUN] Would apply ChaosDecision{mode=LATENCY_AND_EXCEPTION,
-  latencyMs=3000, exception=QueryTimeoutException, scenario='db-timeout'}
-  to OrderRepository#findById
+  latencyMillis=3000, exceptionType=QueryTimeoutException, scenarioName='db-timeout'}
+  to OrderRepository.findById
 ```
 
 ---
@@ -129,10 +132,24 @@ Set `chaos.dry-run=true` to see what chaos would fire without applying it:
 
 If `micrometer-core` is on the classpath, HavocFlow auto-publishes:
 
-| Metric                   | Type    | Tags                        |
-|--------------------------|---------|-----------------------------|
-| `chaos.gremlins.fired`   | Counter | `method`, `mode`, `scenario`|
-| `chaos.latency.injected` | Timer   | `method`, `mode`, `scenario`|
+| Metric                      | Type    | Tags                         |
+|-----------------------------|---------|------------------------------|
+| `chaos.gremlins.fired`      | Counter | `method`, `mode`, `scenario` |
+| `chaos.latency.injected.ms` | Counter | `method`                     |
+
+---
+
+## Package structure
+
+```
+io.havocflow
+├── annotation/       @InjectChaos
+├── aop/              ChaosAspect (AOP interceptor)
+├── autoconfigure/    ChaosAutoConfiguration, ChaosProperties
+├── core/             ChaosEngine, ChaosDecision, FailureMode, LatencyParser
+├── exception/        ChaosGremlinException
+└── metrics/          ChaosMetricsRecorder
+```
 
 ---
 
@@ -158,7 +175,7 @@ public void checkout(Order order) {
 
 1. **Off by default** — does nothing unless `chaos.enabled=true`
 2. **Profile guard** — tie `chaos.enabled=true` to `application-dev.yml`
-3. **Dry-run mode** — logs without acting
+3. **Dry-run mode** — logs without acting (`chaos.dry-run=true`)
 4. **Compile-time visibility** — every chaotic method is annotated, no hidden gremlins
 5. **Test scope** — recommended `<scope>test</scope>` excludes from production artifacts
 
@@ -172,7 +189,13 @@ cd chaos-spring-boot-starter
 mvn clean install
 ```
 
-Requires: Java 17+, Maven 3.8+
+Requires: **Java 8+**, Maven 3.8+, Spring Boot 2.7+ or 3.x
+
+## Compatibility
+
+| HavocFlow | Java  | Spring Boot |
+|-----------|-------|-------------|
+| 1.0.x     | 8–21  | 2.7.x, 3.x  |
 
 ## License
 

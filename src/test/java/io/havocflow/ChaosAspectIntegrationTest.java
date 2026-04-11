@@ -1,22 +1,20 @@
 package io.havocflow;
 
 import io.havocflow.annotation.InjectChaos;
-import io.havocflow.config.ChaosAutoConfiguration;
-import io.havocflow.config.ChaosProperties;
-import io.havocflow.config.ChaosScenarioProperties;
+import io.havocflow.autoconfigure.ChaosAutoConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.stereotype.Service;
 import org.springframework.test.context.TestPropertySource;
 
-import java.util.Map;
-
-import static org.assertj.core.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Integration test that boots a minimal Spring context to verify
@@ -69,17 +67,9 @@ class ChaosAspectIntegrationTest {
         public String neverFail() { return "ok"; }
     }
 
-    @TestConfiguration
+    @SpringBootConfiguration
     static class TestConfig {
         @Bean
         public TestOrderService testOrderService() { return new TestOrderService(); }
-
-        @Bean
-        public ChaosProperties chaosProperties() {
-            ChaosProperties p = new ChaosProperties();
-            p.setEnabled(true);
-            p.setLogGremlins(true);
-            return p;
-        }
     }
 }
