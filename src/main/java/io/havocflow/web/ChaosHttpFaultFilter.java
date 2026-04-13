@@ -4,6 +4,7 @@ import io.havocflow.autoconfigure.ChaosProperties;
 import io.havocflow.core.LatencyParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.util.AntPathMatcher;
 import org.springframework.web.filter.GenericFilterBean;
 
 import javax.servlet.FilterChain;
@@ -14,7 +15,7 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Servlet filter that injects HTTP-layer faults into matching requests.
@@ -43,7 +44,7 @@ public class ChaosHttpFaultFilter extends GenericFilterBean {
     private static final Logger log = LoggerFactory.getLogger(ChaosHttpFaultFilter.class);
 
     private final ChaosProperties properties;
-    private final Random random = new Random();
+    private final AntPathMatcher pathMatcher = new AntPathMatcher();
 
     public ChaosHttpFaultFilter(ChaosProperties properties) {
         this.properties = properties;
@@ -75,7 +76,7 @@ public class ChaosHttpFaultFilter extends GenericFilterBean {
             long latency = Math.min(rawLatency, properties.getMaxLatencyMillis());
             if (latency > 0) {
                 try {
-                    log.warn("[HavocFlow][HTTP] Injecting {}ms latency on {}", latency, requestUri);
+                    log.debug("[HavocFlow][HTTP] Injecting {}ms latency on {}", latency, requestUri);
                     Thread.sleep(latency);
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
@@ -84,9 +85,9 @@ public class ChaosHttpFaultFilter extends GenericFilterBean {
         }
 
         // Inject HTTP error response
-        if (random.nextDouble() < httpFault.getFailureRate()) {
+        if (ThreadLocalRandom.current().nextDouble() < httpFault.getFailureRate()) {
             int statusCode = httpFault.getHttpStatus();
-            log.warn("[HavocFlow][HTTP] Injecting HTTP {} on {}", statusCode, requestUri);
+            log.debug("[HavocFlow][HTTP] Injecting HTTP {} on {}", statusCode, requestUri);
             httpResp.sendError(statusCode, "[HavocFlow] HTTP fault injected");
             return;
         }
@@ -114,12 +115,6 @@ public class ChaosHttpFaultFilter extends GenericFilterBean {
     }
 
     private boolean antMatch(String pattern, String path) {
-        // Convert Ant-style pattern to a simple regex
-        String regex = pattern
-            .replace(".", "\\.")
-            .replace("**", "\u0000")   // placeholder for ** before converting *
-            .replace("*", "[^/]*")
-            .replace("\u0000", ".*");
-        return path.matches(regex);
+        return pathMatcher.match(pattern, path);
     }
 }

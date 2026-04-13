@@ -2,8 +2,15 @@
 
 All notable changes to HavocFlow will be documented in this file.
 
-The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
+
+### Version format: `MAJOR.MINOR.HOTFIX` (zero-padded, e.g. `01.02.03`)
+
+| Segment | When to bump | Example trigger |
+|---------|-------------|-----------------|
+| **MAJOR** | Breaking API or config changes | Rename annotation attribute, remove a property, change behaviour contract |
+| **MINOR** | New backwards-compatible features (target: ~2-week sprint) | New gremlin strategy, new config option, new annotation |
+| **HOTFIX** | Urgent bug fixes and security patches | Fix a ReDoS, fix a data race, fix a crash |
 
 ---
 
@@ -13,7 +20,22 @@ _No unreleased changes yet._
 
 ---
 
-## [1.0.0] — 2026-04-11
+## [01.00.01] — Unreleased
+
+### Fixed
+- `ChaosHttpFaultFilter`: replaced hand-rolled Ant regex with Spring `AntPathMatcher` (eliminates ReDoS risk)
+- `ChaosEngine` / `ChaosHttpFaultFilter`: replaced shared `Random` with `ThreadLocalRandom` (thread-safe probability)
+- `ChaosProperties`: `dryRun` field marked `volatile` (prevents JVM visibility race on actuator toggle)
+- `LatencyParser`: rejects numeric values > 999,999,999 before unit multiplication (prevents `NumberFormatException` on absurd input)
+- `ChaosEngine`: emits one-time `INFO` advisory at startup when `allowed-exception-classes` is not configured
+- `ChaosHttpFaultFilter`: per-request HTTP fault log demoted from `WARN` to `DEBUG`
+
+### Added
+- `SECURITY.md`: private vulnerability reporting path, production safety warnings, allowlist guidance
+
+---
+
+## [01.00.00] — 2026-04-11
 
 ### Added
 
@@ -62,5 +84,5 @@ _No unreleased changes yet._
 - Java 8 through Java 21
 - `spring.factories` + `AutoConfiguration.imports` dual registration
 
-[Unreleased]: https://github.com/havocflow/chaos-spring-boot-starter/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/havocflow/chaos-spring-boot-starter/releases/tag/v1.0.0
+[01.00.01]: https://github.com/havocflow/chaos-spring-boot-starter/compare/v01.00.00...HEAD
+[01.00.00]: https://github.com/havocflow/chaos-spring-boot-starter/releases/tag/v01.00.00

@@ -37,7 +37,7 @@ public class ChaosProperties {
      * When {@code true}, logs what chaos would fire but does not actually inject
      * latency or throw exceptions. Safe to leave enabled in CI.
      */
-    private boolean dryRun = false;
+    private volatile boolean dryRun = false;
 
     /** Fallback failure rate when {@code @InjectChaos} has no {@code failureRate} set. */
     private double defaultFailureRate = 0.0;

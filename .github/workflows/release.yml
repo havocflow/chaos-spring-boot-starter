@@ -1,0 +1,44 @@
+name: Release to Maven Central
+
+# Triggered by pushing a version tag: git tag v01.00.00 && git push origin v01.00.00
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    name: Deploy to Maven Central
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # Java 8 is used here deliberately: this project targets Java 8 (maven.compiler.source=1.8).
+      # Building the release artifact with the minimum supported JDK proves the compiled JAR
+      # runs on Java 8 consumers. actions/setup-java@v4 fully supports Temurin JDK 8.
+      - name: Set up JDK 8 with signing & deploy credentials
+        uses: actions/setup-java@v4
+        with:
+          java-version: '8'
+          distribution: 'temurin'
+          server-id: ossrh
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_PASSWORD
+          gpg-private-key: ${{ secrets.GPG_SIGNING_KEY }}
+          gpg-passphrase: MAVEN_GPG_PASSPHRASE
+
+      - name: Build, sign and deploy to Maven Central
+        run: mvn --no-transfer-progress --batch-mode deploy -P release
+        env:
+          MAVEN_USERNAME: ${{ secrets.OSSRH_USERNAME }}
+          MAVEN_PASSWORD: ${{ secrets.OSSRH_PASSWORD }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+
+      # Create a GitHub Release automatically from the pushed tag.
+      # The body is the CHANGELOG section for this version (optional — remove if not needed).
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true

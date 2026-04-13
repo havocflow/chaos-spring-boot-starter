@@ -70,6 +70,13 @@ public final class LatencyParser {
     }
 
     private static long toMillis(long value, String unit) {
+        // Guard against values that would overflow or produce absurdly large sleeps.
+        // The hard cap in ChaosEngine (default 30 s) enforces the runtime ceiling,
+        // but we reject clearly unreasonable values here at parse time.
+        if (value > 999_999_999L) {
+            throw new IllegalArgumentException(
+                "Latency value " + value + unit + " is too large (max numeric value: 999999999)");
+        }
         switch (unit) {
             case "ms": return value;
             case "s":  return value * 1_000L;

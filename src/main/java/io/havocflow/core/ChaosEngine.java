@@ -5,7 +5,7 @@ import io.havocflow.autoconfigure.ChaosProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Core decision engine. Given an {@link InjectChaos} annotation on a method,
@@ -27,7 +27,6 @@ public class ChaosEngine {
     private static final Logger log = LoggerFactory.getLogger(ChaosEngine.class);
 
     private final ChaosProperties properties;
-    private final Random random = new Random();
 
     /**
      * Constructs a {@code ChaosEngine} backed by the given configuration.
@@ -104,7 +103,7 @@ public class ChaosEngine {
         double rate = (inlineOverride != null && inlineOverride.failureRate() > 0)
                 ? inlineOverride.failureRate()
                 : scenario.getFailureRate();
-        boolean shouldFail = random.nextDouble() < rate;
+        boolean shouldFail = ThreadLocalRandom.current().nextDouble() < rate;
 
         // Inline exception overrides scenario exception only when overridable=true and not the default
         Class<? extends Throwable> exType = null;
@@ -138,7 +137,7 @@ public class ChaosEngine {
         double rate = rawRate > 0
                 ? rawRate
                 : properties.getDefaultFailureRate();
-        boolean shouldFail = rate > 0 && random.nextDouble() < rate;
+        boolean shouldFail = rate > 0 && ThreadLocalRandom.current().nextDouble() < rate;
 
         FailureMode mode = determineMode(latencyMillis, shouldFail);
         Class<? extends Throwable> exType = shouldFail ? chaos.exception() : null;
@@ -167,8 +166,23 @@ public class ChaosEngine {
         return rawMillis;
     }
 
+    /**
+     * Logs an INFO-level advisory at the first call when no allowlist is configured,
+     * so operators are aware that any {@link Throwable} subclass on the classpath is accepted.
+     * Called once per engine instance (not per invocation) via the flag below.
+     */
+    private volatile boolean allowlistWarningEmitted = false;
+
     @SuppressWarnings("unchecked")
     private Class<? extends Throwable> loadExceptionClass(String className) {
+        // Advisory: remind operators to configure an allowlist for stricter security
+        if (!allowlistWarningEmitted && properties.getAllowedExceptionClasses().isEmpty()) {
+            log.info("[HavocFlow] chaos.allowed-exception-classes is not configured — any Throwable "
+                    + "subclass on the classpath may be used. Set this list to restrict injection "
+                    + "to approved exception types in shared or multi-tenant environments.");
+            allowlistWarningEmitted = true;
+        }
+
         // Deny-list: reject class names that could have dangerous constructor side effects
         if (isDangerousClass(className)) {
             log.warn("[HavocFlow] Exception class '{}' is potentially dangerous — using RuntimeException", className);
