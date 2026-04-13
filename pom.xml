@@ -5,7 +5,7 @@
          https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>io.havocflow</groupId>
+    <groupId>io.github.havocflow</groupId>
     <artifactId>chaos-spring-boot-starter</artifactId>
     <version>01.00.00</version>
     <packaging>jar</packaging>
@@ -18,6 +18,8 @@
         Compatible with Java 8+ and Spring Boot 2.7+ / 3.x.
     </description>
     <url>https://github.com/havocflow/chaos-spring-boot-starter</url>
+
+    <!-- groupId matches verified Sonatype namespace: io.github.havocflow -->
 
     <licenses>
         <license>
@@ -49,14 +51,11 @@
         <url>https://github.com/havocflow/chaos-spring-boot-starter/issues</url>
     </issueManagement>
 
+    <!-- New Maven Central portal (accounts created after Feb 2024) -->
     <distributionManagement>
-        <snapshotRepository>
-            <id>ossrh</id>
-            <url>https://s01.oss.sonatype.org/content/repositories/snapshots</url>
-        </snapshotRepository>
         <repository>
-            <id>ossrh</id>
-            <url>https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/</url>
+            <id>central</id>
+            <url>https://central.sonatype.com/</url>
         </repository>
     </distributionManagement>
 
@@ -188,16 +187,16 @@
                 </executions>
             </plugin>
 
-            <!-- Automated staging and release to Maven Central -->
+            <!-- New Maven Central portal publisher (replaces legacy nexus-staging-maven-plugin) -->
             <plugin>
-                <groupId>org.sonatype.plugins</groupId>
-                <artifactId>nexus-staging-maven-plugin</artifactId>
-                <version>1.6.13</version>
+                <groupId>org.sonatype.central</groupId>
+                <artifactId>central-publishing-maven-plugin</artifactId>
+                <version>0.7.0</version>
                 <extensions>true</extensions>
                 <configuration>
-                    <serverId>ossrh</serverId>
-                    <nexusUrl>https://s01.oss.sonatype.org/</nexusUrl>
-                    <autoReleaseAfterClose>true</autoReleaseAfterClose>
+                    <publishingServerId>central</publishingServerId>
+                    <autoPublish>true</autoPublish>
+                    <waitUntil>published</waitUntil>
                 </configuration>
             </plugin>
         </plugins>

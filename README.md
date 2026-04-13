@@ -1,7 +1,7 @@
 # HavocFlow — Chaos Spring Boot Starter
 
 [![CI](https://github.com/havocflow/chaos-spring-boot-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/havocflow/chaos-spring-boot-starter/actions/workflows/ci.yml)
-[![Maven Central](https://img.shields.io/maven-central/v/io.havocflow/chaos-spring-boot-starter.svg)](https://central.sonatype.com/artifact/io.havocflow/chaos-spring-boot-starter)
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.havocflow/chaos-spring-boot-starter.svg)](https://central.sonatype.com/artifact/io.github.havocflow/chaos-spring-boot-starter)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Java 8+](https://img.shields.io/badge/java-8%2B-orange.svg)](https://adoptium.net/)
 
@@ -33,13 +33,23 @@ public class OrderRepository {
 
 ### 1. Add the dependency
 
+**Maven:**
 ```xml
 <dependency>
-    <groupId>io.havocflow</groupId>
+    <groupId>io.github.havocflow</groupId>
     <artifactId>chaos-spring-boot-starter</artifactId>
-    <version>1.0.0</version>
-    <scope>test</scope>
+    <version>01.00.00</version>
 </dependency>
+```
+
+**Gradle:**
+```groovy
+implementation 'io.github.havocflow:chaos-spring-boot-starter:01.00.00'
+```
+
+**Gradle (Kotlin DSL):**
+```kotlin
+implementation("io.github.havocflow:chaos-spring-boot-starter:01.00.00")
 ```
 
 ### 2. Enable chaos in dev/staging
@@ -272,9 +282,9 @@ Requires: **Java 8+**, Maven 3.8+, Spring Boot 2.7+ or 3.x
 
 ## Compatibility
 
-| HavocFlow | Java  | Spring Boot |
-|-----------|-------|-------------|
-| 1.0.x     | 8–21  | 2.7.x, 3.x  |
+| HavocFlow  | Java  | Spring Boot |
+|------------|-------|-------------|
+| 01.00.00   | 8–21  | 2.7.x, 3.x  |
 
 ## Performance & overhead
 
