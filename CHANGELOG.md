@@ -20,7 +20,49 @@ _No unreleased changes yet._
 
 ---
 
-## [01.00.01] — Unreleased
+## [01.02.00] — 2026-04-14
+
+### Added
+
+**`@SuppressChaos` annotation**
+- New `@SuppressChaos` method annotation that exempts a specific method from class-level or
+  interface-level `@InjectChaos` chaos injection without removing the class annotation.
+- Enforced at both the AspectJ pointcut level and with a belt-and-suspenders runtime guard in
+  `ChaosAspect`, so new advice paths added in future also respect the suppression.
+
+**Scenario inheritance**
+- Named scenarios can now extend a base scenario via `chaos.scenarios.<name>.extends: <base-name>`.
+- Merge rules: child field wins when explicitly set (non-blank latency, rate > 0, non-default
+  exception); otherwise the base value is used.
+- Circular-reference detection: throws `IllegalStateException` if the extends chain exceeds 10 levels.
+
+**Chaos scheduling**
+- New `chaos.schedule.cron` + `chaos.schedule.duration` properties enable time-windowed chaos:
+  chaos is active only during the configured cron window and auto-disables when the duration elapses.
+- Implemented by `ChaosScheduler` (new bean, registered conditionally on `chaos.schedule.enabled=true`
+  and a Spring `TaskScheduler` bean being present).
+- Window state (`scheduleWindowActive`) is a `volatile boolean` on `ChaosProperties`; `ChaosAspect`
+  passes all calls through when the window is closed.
+
+**Structured audit log**
+- New `chaos.audit-log.enabled` + `chaos.audit-log.path` properties activate an append-only
+  JSON-lines audit file that records every gremlin fired with timestamp, method, mode, scenario,
+  latencyMs, and thread name.
+- Implemented by `ChaosAuditLogger` (new bean). Zero new dependencies — JSON is hand-crafted.
+- File is flushed after every entry and closed cleanly on shutdown.
+
+### Security
+
+- `LatencyParser`: replaced `java.util.Random` with `ThreadLocalRandom` (thread-safe; no shared
+  mutable state across threads). Tracking issue originally filed under 01.00.01.
+- GitHub Actions `release.yml`: `softprops/action-gh-release` pinned to commit SHA
+  `3bb12739c298aeb8a4eeaf626c5b8d85266b0e65` (was floating `v2` tag — supply chain risk).
+- GitHub Actions `ci.yml` / `release.yml`: added explicit `permissions` blocks (`contents: read`
+  and `contents: write` respectively) following least-privilege principle.
+
+---
+
+## [01.00.01] — Unreleased (security fixes folded into 01.02.00)
 
 ### Fixed
 - `ChaosHttpFaultFilter`: replaced hand-rolled Ant regex with Spring `AntPathMatcher` (eliminates ReDoS risk)

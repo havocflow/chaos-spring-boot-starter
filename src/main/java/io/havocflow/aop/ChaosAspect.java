@@ -1,6 +1,8 @@
 package io.havocflow.aop;
 
 import io.havocflow.annotation.InjectChaos;
+import io.havocflow.annotation.SuppressChaos;
+import io.havocflow.audit.ChaosAuditLogger;
 import io.havocflow.autoconfigure.ChaosProperties;
 import io.havocflow.core.ChaosDecision;
 import io.havocflow.core.ChaosEngine;
@@ -40,6 +42,7 @@ public class ChaosAspect {
     private final ChaosProperties properties;
     private final Optional<ChaosMetricsRecorder> metricsRecorder;
     private final Optional<ChaosEventStore> eventStore;
+    private final Optional<ChaosAuditLogger> auditLogger;
     private final List<ChaosStrategy> strategies;
 
     /**
@@ -55,11 +58,13 @@ public class ChaosAspect {
                        ChaosProperties properties,
                        Optional<ChaosMetricsRecorder> metricsRecorder,
                        ChaosEventStore eventStore,
+                       Optional<ChaosAuditLogger> auditLogger,
                        List<ChaosStrategy> strategies) {
         this.engine = engine;
         this.properties = properties;
         this.metricsRecorder = metricsRecorder;
         this.eventStore = Optional.ofNullable(eventStore);
+        this.auditLogger = auditLogger != null ? auditLogger : Optional.<ChaosAuditLogger>empty();
         this.strategies = strategies != null ? strategies : Collections.<ChaosStrategy>emptyList();
     }
 
@@ -77,7 +82,7 @@ public class ChaosAspect {
      * unless the method has its own {@code @InjectChaos} (handled by
      * {@link #aroundAnnotatedMethod}).
      */
-    @Around("@within(chaos) && !@annotation(io.havocflow.annotation.InjectChaos)")
+    @Around("@within(chaos) && !@annotation(io.havocflow.annotation.InjectChaos) && !@annotation(io.havocflow.annotation.SuppressChaos)")
     public Object aroundAnnotatedClass(ProceedingJoinPoint pjp, InjectChaos chaos)
             throws Throwable {
         return applyChaos(pjp, chaos);
@@ -95,7 +100,7 @@ public class ChaosAspect {
      * This advice only fires when neither the concrete method nor its declaring class
      * carries {@code @InjectChaos} directly (those cases are handled by the two advices above).
      */
-    @Around("execution(public * *(..)) && !@annotation(io.havocflow.annotation.InjectChaos) && !@within(io.havocflow.annotation.InjectChaos) && !within(io.havocflow.autoconfigure..*) && !within(io.havocflow.aop..*) && !within(org.springframework..*)")
+    @Around("execution(public * *(..)) && !@annotation(io.havocflow.annotation.InjectChaos) && !@annotation(io.havocflow.annotation.SuppressChaos) && !@within(io.havocflow.annotation.InjectChaos) && !within(io.havocflow.autoconfigure..*) && !within(io.havocflow.aop..*) && !within(org.springframework..*)")
     public Object aroundInterfaceAnnotation(ProceedingJoinPoint pjp) throws Throwable {
         InjectChaos chaos = resolveInterfaceAnnotation(pjp);
         if (chaos == null) {
@@ -143,6 +148,18 @@ public class ChaosAspect {
     // -----------------------------------------------------------------------
 
     private Object applyChaos(ProceedingJoinPoint pjp, InjectChaos chaos) throws Throwable {
+        // Belt-and-suspenders: skip if the concrete method carries @SuppressChaos
+        // (handles any future advice path that bypasses the pointcut exclusion).
+        Method concreteMethod = ((MethodSignature) pjp.getSignature()).getMethod();
+        if (concreteMethod.isAnnotationPresent(SuppressChaos.class)) {
+            return pjp.proceed();
+        }
+
+        // If a cron schedule is configured and the window is currently closed, pass through
+        if (!properties.isScheduleWindowActive()) {
+            return pjp.proceed();
+        }
+
         String methodName = resolveMethodName(pjp);
         ChaosDecision decision = engine.decide(chaos, methodName);
 
@@ -154,6 +171,7 @@ public class ChaosAspect {
         // the downstream method itself throws.
         metricsRecorder.ifPresent(r -> r.recordGremlin(methodName, decision));
         eventStore.ifPresent(s -> s.record(methodName, decision));
+        auditLogger.ifPresent(a -> a.record(methodName, decision, Thread.currentThread().getName()));
 
         if (properties.isLogGremlins()) {
             log.warn("[HavocFlow] Gremlin fired — method={} mode={} scenario={} latency={}ms",

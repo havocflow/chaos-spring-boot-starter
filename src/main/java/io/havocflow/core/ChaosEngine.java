@@ -5,6 +5,7 @@ import io.havocflow.autoconfigure.ChaosProperties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
@@ -85,7 +86,7 @@ public class ChaosEngine {
      *                       When null (overridable=false), the scenario is authoritative.
      */
     private ChaosDecision resolveFromScenario(String scenarioName, InjectChaos inlineOverride) {
-        ChaosProperties.ScenarioProperties scenario = properties.getScenarios().get(scenarioName);
+        ChaosProperties.ScenarioProperties scenario = resolveScenario(scenarioName, properties.getScenarios(), 0);
         if (scenario == null) {
             log.warn("[HavocFlow] Unknown scenario '{}' — no chaos injected. "
                     + "Define it under chaos.scenarios.{} in application.yml",
@@ -164,6 +165,56 @@ public class ChaosEngine {
             return cap;
         }
         return rawMillis;
+    }
+
+    /** Maximum inheritance depth to prevent circular extends chains. */
+    private static final int MAX_EXTENDS_DEPTH = 10;
+
+    /**
+     * Resolves a named scenario, merging inherited fields from the {@code extends} chain.
+     *
+     * <p>Merge rules (child wins when explicitly set, otherwise falls back to base):
+     * <ul>
+     *   <li>{@code latency}: child non-blank wins; else base</li>
+     *   <li>{@code failureRate}: child &gt; 0 wins; else base</li>
+     *   <li>{@code exception}: child not the default {@code "java.lang.RuntimeException"} wins; else base</li>
+     *   <li>{@code strategy}: child non-blank wins; else base</li>
+     * </ul>
+     *
+     * @return the merged scenario, or {@code null} if the name is not found
+     * @throws IllegalStateException if the inheritance chain exceeds {@value #MAX_EXTENDS_DEPTH} levels
+     */
+    private ChaosProperties.ScenarioProperties resolveScenario(
+            String name,
+            Map<String, ChaosProperties.ScenarioProperties> all,
+            int depth) {
+        if (depth > MAX_EXTENDS_DEPTH) {
+            throw new IllegalStateException(
+                "[HavocFlow] Scenario inheritance chain for '" + name + "' exceeds "
+                + MAX_EXTENDS_DEPTH + " levels — possible circular extends");
+        }
+        ChaosProperties.ScenarioProperties child = all.get(name);
+        if (child == null) {
+            return null;
+        }
+        String parentName = child.getExtendsScenario();
+        if (parentName == null || parentName.trim().isEmpty()) {
+            return child;
+        }
+        ChaosProperties.ScenarioProperties base = resolveScenario(parentName, all, depth + 1);
+        if (base == null) {
+            log.warn("[HavocFlow] Scenario '{}' extends unknown base '{}' — ignoring inheritance",
+                    name, parentName);
+            return child;
+        }
+        // Merge: child overrides base only where child has a non-default value
+        ChaosProperties.ScenarioProperties merged = new ChaosProperties.ScenarioProperties();
+        merged.setLatency(!child.getLatency().trim().isEmpty() ? child.getLatency() : base.getLatency());
+        merged.setFailureRate(child.getFailureRate() > 0.0 ? child.getFailureRate() : base.getFailureRate());
+        String defaultEx = "java.lang.RuntimeException";
+        merged.setException(!child.getException().equals(defaultEx) ? child.getException() : base.getException());
+        merged.setStrategy(!child.getStrategy().trim().isEmpty() ? child.getStrategy() : base.getStrategy());
+        return merged;
     }
 
     /**

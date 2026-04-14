@@ -1,6 +1,6 @@
 package io.havocflow.core;
 
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,8 +26,6 @@ public final class LatencyParser {
 
     /** Matches a jitter range like {@code 100ms-2s} or {@code 1s-5s}. */
     private static final Pattern RANGE  = Pattern.compile("^(\\d+)(ms|s|m)-(\\d+)(ms|s|m)$");
-
-    private static final Random RANDOM = new Random();
 
     private LatencyParser() {}
 
@@ -56,7 +54,7 @@ public final class LatencyParser {
             }
             // When low == high, (high - low) == 0, so nextDouble() * 0 == 0, returning exactly low.
             // Using (high - low) instead of (high - low + 1) keeps the result strictly within [low, high].
-            return low + (long) (RANDOM.nextDouble() * (high - low));
+            return low + (long) (ThreadLocalRandom.current().nextDouble() * (high - low));
         }
 
         Matcher single = SINGLE.matcher(expr);

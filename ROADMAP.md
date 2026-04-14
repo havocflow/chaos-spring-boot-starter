@@ -24,11 +24,17 @@ so it no longer crashes on Spring Boot 3.x (filter simply won't register; all ot
 Configurable HTTP fault response body, library+version Micrometer tags, and `@InjectChaos` support
 on Spring `@Component` interfaces.
 
+### [01.02.00] — 2026-04-14 — Developer ergonomics + security hardening
+`@SuppressChaos` annotation to exempt individual methods from class-level chaos. Scenario inheritance
+(`extends` field in scenario config). Time-windowed chaos scheduling (`chaos.schedule.cron` +
+`chaos.schedule.duration`). Structured append-only JSON-lines audit log. Security: `ThreadLocalRandom`
+in `LatencyParser`, pinned GitHub Action SHA, explicit workflow permissions.
+
 ---
 
 ## In Progress
 
-### [01.00.01] — Hotfix — Security hardening
+### [01.00.01] — Hotfix — Security hardening (folded into 01.02.00)
 Fixes identified during open-source readiness audit. No API or config changes.
 
 - [x] Replace `antMatch()` regex with Spring `AntPathMatcher` (ReDoS fix)
@@ -42,60 +48,6 @@ Fixes identified during open-source readiness audit. No API or config changes.
 ---
 
 ## Planned
-
-### [01.02.00] — Minor — Developer ergonomics
-**Target: ~4 weeks after 01.01.00**
-
-Features most commonly requested by chaos engineering users.
-
-#### `@SuppressChaos` annotation
-Exclude a specific method from class-level `@InjectChaos` without removing the class annotation.
-```java
-@InjectChaos(latency = "200ms", failureRate = 0.1)
-public class OrderService {
-
-    public Order findById(String id) { ... }   // chaos applied
-
-    @SuppressChaos                             // excluded
-    public Order save(Order order) { ... }
-}
-```
-
-#### Scenario inheritance
-A named scenario can extend a base scenario and override only specific fields:
-```yaml
-chaos:
-  scenarios:
-    base-latency:
-      latency: "100ms"
-      failure-rate: 0.05
-    db-timeout:
-      extends: base-latency      # inherits latency and failure-rate
-      latency: "3s"              # overrides only latency
-      exception: org.springframework.dao.QueryTimeoutException
-```
-
-#### Chaos scheduling
-Enable chaos on a cron window and auto-disable when the window closes — no manual toggle needed:
-```yaml
-chaos:
-  schedule:
-    enabled: true
-    cron: "0 0 10 * * MON-FRI"   # every weekday at 10:00
-    duration: "30m"               # active for 30 minutes, then auto-off
-```
-
-#### Structured chaos audit log
-Append-only JSON log of every gremlin fired (timestamp, method, mode, scenario, latency, thread).
-Useful for incident investigations and compliance reviews:
-```yaml
-chaos:
-  audit-log:
-    enabled: true
-    path: /var/log/havocflow-audit.jsonl
-```
-
----
 
 ### [01.03.00] — Minor — Ecosystem integrations
 **Target: ~6 weeks after 01.02.00**

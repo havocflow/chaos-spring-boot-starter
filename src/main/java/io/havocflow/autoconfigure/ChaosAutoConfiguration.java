@@ -2,14 +2,17 @@ package io.havocflow.autoconfigure;
 
 import io.havocflow.actuator.ChaosEndpoint;
 import io.havocflow.aop.ChaosAspect;
+import io.havocflow.audit.ChaosAuditLogger;
 import io.havocflow.core.ChaosEngine;
 import io.havocflow.event.ChaosEventStore;
 import io.havocflow.gremlins.ConnectionPoolExhaustionStrategy;
 import io.havocflow.gremlins.CpuStressStrategy;
 import io.havocflow.gremlins.MemoryPressureStrategy;
 import io.havocflow.metrics.ChaosMetricsRecorder;
+import io.havocflow.schedule.ChaosScheduler;
 import io.havocflow.spi.ChaosStrategy;
 import io.havocflow.web.ChaosHttpFaultFilter;
+import org.springframework.scheduling.TaskScheduler;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -162,9 +165,35 @@ public class ChaosAutoConfiguration {
                                    ChaosProperties properties,
                                    Optional<ChaosMetricsRecorder> metricsRecorder,
                                    ChaosEventStore eventStore,
+                                   Optional<ChaosAuditLogger> auditLogger,
                                    List<ChaosStrategy> strategies) {
-        return new ChaosAspect(engine, properties, metricsRecorder, eventStore,
+        return new ChaosAspect(engine, properties, metricsRecorder, eventStore, auditLogger,
             strategies != null ? strategies : Collections.<ChaosStrategy>emptyList());
+    }
+
+    /**
+     * Registers the {@link ChaosScheduler} when {@code chaos.schedule.enabled=true} and
+     * a {@link TaskScheduler} bean is available in the context.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "chaos.schedule", name = "enabled", havingValue = "true")
+    @ConditionalOnBean(TaskScheduler.class)
+    public ChaosScheduler chaosScheduler(ChaosProperties properties, TaskScheduler taskScheduler) {
+        log.info("[HavocFlow] Chaos scheduler enabled — cron='{}' duration='{}'",
+                properties.getSchedule().getCron(), properties.getSchedule().getDuration());
+        return new ChaosScheduler(properties, taskScheduler);
+    }
+
+    /**
+     * Registers the {@link ChaosAuditLogger} when {@code chaos.audit-log.enabled=true}.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "chaos.audit-log", name = "enabled", havingValue = "true")
+    public ChaosAuditLogger chaosAuditLogger(ChaosProperties properties) {
+        log.info("[HavocFlow] Audit log enabled — path='{}'", properties.getAuditLog().getPath());
+        return new ChaosAuditLogger(properties.getAuditLog().getPath());
     }
 
     // -----------------------------------------------------------------------

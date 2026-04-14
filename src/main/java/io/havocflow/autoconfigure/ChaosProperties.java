@@ -227,6 +227,26 @@ public class ChaosProperties {
 
         public String getStrategy() { return strategy; }
         public void setStrategy(String strategy) { this.strategy = strategy; }
+
+        /**
+         * Optional name of a base scenario to inherit from.
+         * Fields set in this scenario override the base; unset fields fall back to the base value.
+         * <pre>
+         * chaos:
+         *   scenarios:
+         *     base-latency:
+         *       latency: "100ms"
+         *       failure-rate: 0.05
+         *     db-timeout:
+         *       extends: base-latency
+         *       latency: "3s"          # overrides base latency
+         *       # failure-rate inherited from base-latency (0.05)
+         * </pre>
+         */
+        private String extendsScenario = "";
+
+        public String getExtendsScenario() { return extendsScenario; }
+        public void setExtendsScenario(String extendsScenario) { this.extendsScenario = extendsScenario; }
     }
 
     // -----------------------------------------------------------------------
@@ -349,4 +369,95 @@ public class ChaosProperties {
 
     public GremlinProperties getGremlins()              { return gremlins; }
     public void setGremlins(GremlinProperties gremlins) { this.gremlins = gremlins; }
+
+    // -----------------------------------------------------------------------
+    // Scheduling configuration
+    // -----------------------------------------------------------------------
+
+    /**
+     * Configuration for time-windowed chaos activation.
+     * <pre>
+     * chaos:
+     *   schedule:
+     *     enabled: true
+     *     cron: "0 0 10 * * MON-FRI"   # every weekday at 10:00
+     *     duration: "30m"               # active for 30 minutes then auto-off
+     * </pre>
+     */
+    public static class ScheduleProperties {
+
+        /** Whether cron-based chaos scheduling is enabled. Default: false. */
+        private boolean enabled = false;
+
+        /**
+         * Spring cron expression for when the chaos window opens.
+         * Uses six-field format: {@code second minute hour day-of-month month day-of-week}.
+         */
+        private String cron = "";
+
+        /**
+         * How long each chaos window stays open before auto-disabling.
+         * Supports the same format as {@code @InjectChaos(latency)}: e.g. {@code "30m"}, {@code "5s"}.
+         * Default: {@code "30m"}.
+         */
+        private String duration = "30m";
+
+        public boolean isEnabled()          { return enabled; }
+        public void setEnabled(boolean v)   { this.enabled = v; }
+        public String getCron()             { return cron; }
+        public void setCron(String v)       { this.cron = v; }
+        public String getDuration()         { return duration; }
+        public void setDuration(String v)   { this.duration = v; }
+    }
+
+    private ScheduleProperties schedule = new ScheduleProperties();
+
+    public ScheduleProperties getSchedule()               { return schedule; }
+    public void setSchedule(ScheduleProperties schedule)  { this.schedule = schedule; }
+
+    /**
+     * Runtime flag set by {@link io.havocflow.schedule.ChaosScheduler} when scheduling is active.
+     * When {@code false}, {@code ChaosAspect} passes all calls through without injecting chaos.
+     * Defaults to {@code true} so that non-scheduled setups are unaffected.
+     */
+    private volatile boolean scheduleWindowActive = true;
+
+    public boolean isScheduleWindowActive()               { return scheduleWindowActive; }
+    public void setScheduleWindowActive(boolean active)   { this.scheduleWindowActive = active; }
+
+    // -----------------------------------------------------------------------
+    // Audit log configuration
+    // -----------------------------------------------------------------------
+
+    /**
+     * Configuration for the structured chaos audit log.
+     * <pre>
+     * chaos:
+     *   audit-log:
+     *     enabled: true
+     *     path: /var/log/havocflow-audit.jsonl
+     * </pre>
+     */
+    public static class AuditLogProperties {
+
+        /** Whether the audit log is enabled. Default: false. */
+        private boolean enabled = false;
+
+        /**
+         * Path of the append-only JSON-lines audit file.
+         * Relative paths are resolved from the working directory.
+         * Default: {@code havocflow-audit.jsonl}.
+         */
+        private String path = "havocflow-audit.jsonl";
+
+        public boolean isEnabled()        { return enabled; }
+        public void setEnabled(boolean v) { this.enabled = v; }
+        public String getPath()           { return path; }
+        public void setPath(String v)     { this.path = v; }
+    }
+
+    private AuditLogProperties auditLog = new AuditLogProperties();
+
+    public AuditLogProperties getAuditLog()               { return auditLog; }
+    public void setAuditLog(AuditLogProperties auditLog)  { this.auditLog = auditLog; }
 }
