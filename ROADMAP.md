@@ -18,9 +18,11 @@ three gremlin strategies (CPU, memory, connection pool), Micrometer metrics, Act
 production safety guard, dry-run mode.
 
 ### [01.01.00] — 2026-04-14 — Test coverage + Spring Boot 3.x compatibility
-Full unit and integration test suite for all previously untested components. Spring Boot 3.x support
-via dual-filter strategy (javax/jakarta). Configurable HTTP fault response body, library+version
-Micrometer tags, and `@InjectChaos` support on Spring `@Component` interfaces.
+Full unit and integration test suite for all previously untested components. Spring Boot 3.x partial
+support: `ChaosHttpFaultFilter` is now guarded with `@ConditionalOnClass("javax.servlet.FilterChain")`
+so it no longer crashes on Spring Boot 3.x (filter simply won't register; all other features work).
+Configurable HTTP fault response body, library+version Micrometer tags, and `@InjectChaos` support
+on Spring `@Component` interfaces.
 
 ---
 
