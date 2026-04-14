@@ -16,6 +16,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -80,6 +81,61 @@ public class ChaosAspect {
     public Object aroundAnnotatedClass(ProceedingJoinPoint pjp, InjectChaos chaos)
             throws Throwable {
         return applyChaos(pjp, chaos);
+    }
+
+    /**
+     * Intercepts public methods where the target class implements an interface
+     * annotated with {@code @InjectChaos} (at the interface type or method level).
+     *
+     * <p>This enables {@code @InjectChaos} on Spring {@code @Component} interfaces so
+     * that any concrete bean implementing the interface receives chaos injection without
+     * annotating the implementation class directly.
+     *
+     * <p>Method-level interface annotation takes priority over interface type annotation.
+     * This advice only fires when neither the concrete method nor its declaring class
+     * carries {@code @InjectChaos} directly (those cases are handled by the two advices above).
+     */
+    @Around("execution(public * *(..)) && !@annotation(io.havocflow.annotation.InjectChaos) && !@within(io.havocflow.annotation.InjectChaos) && !within(io.havocflow.autoconfigure..*) && !within(io.havocflow.aop..*) && !within(org.springframework..*)")
+    public Object aroundInterfaceAnnotation(ProceedingJoinPoint pjp) throws Throwable {
+        InjectChaos chaos = resolveInterfaceAnnotation(pjp);
+        if (chaos == null) {
+            return pjp.proceed();
+        }
+        return applyChaos(pjp, chaos);
+    }
+
+    /**
+     * Scans the target object's implemented interfaces for an {@code @InjectChaos} annotation.
+     * Checks method-level annotation on the interface method first; falls back to the
+     * interface type annotation. Returns {@code null} if no annotation is found.
+     */
+    private InjectChaos resolveInterfaceAnnotation(ProceedingJoinPoint pjp) {
+        Object target = pjp.getTarget();
+        if (target == null) {
+            return null;
+        }
+        MethodSignature sig = (MethodSignature) pjp.getSignature();
+        String methodName = sig.getMethod().getName();
+        Class<?>[] paramTypes = sig.getMethod().getParameterTypes();
+
+        for (Class<?> iface : target.getClass().getInterfaces()) {
+            // Check for method-level annotation on the interface first
+            try {
+                Method ifaceMethod = iface.getMethod(methodName, paramTypes);
+                InjectChaos methodAnnotation = ifaceMethod.getAnnotation(InjectChaos.class);
+                if (methodAnnotation != null) {
+                    return methodAnnotation;
+                }
+            } catch (NoSuchMethodException ignored) {
+                // this interface does not declare the method — continue
+            }
+            // Fall back to interface type-level annotation
+            InjectChaos typeAnnotation = iface.getAnnotation(InjectChaos.class);
+            if (typeAnnotation != null) {
+                return typeAnnotation;
+            }
+        }
+        return null;
     }
 
     // -----------------------------------------------------------------------

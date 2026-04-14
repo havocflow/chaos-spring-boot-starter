@@ -263,6 +263,9 @@ public class ChaosProperties {
         /** URL path patterns that the filter applies to (Ant-style). Empty = all paths. */
         private List<String> pathPatterns = new ArrayList<String>();
 
+        /** Response body text written when an HTTP fault fires. Default: "[HavocFlow] HTTP fault injected". */
+        private String responseBody = "[HavocFlow] HTTP fault injected";
+
         public boolean isEnabled() { return enabled; }
         public void setEnabled(boolean enabled) { this.enabled = enabled; }
 
@@ -283,6 +286,9 @@ public class ChaosProperties {
 
         public List<String> getPathPatterns() { return pathPatterns; }
         public void setPathPatterns(List<String> pathPatterns) { this.pathPatterns = pathPatterns; }
+
+        public String getResponseBody() { return responseBody; }
+        public void setResponseBody(String responseBody) { this.responseBody = responseBody; }
     }
 
     private HttpFaultProperties httpFault = new HttpFaultProperties();

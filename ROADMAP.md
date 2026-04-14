@@ -17,6 +17,11 @@ First open-source release. Annotation-driven chaos injection, AOP interception, 
 three gremlin strategies (CPU, memory, connection pool), Micrometer metrics, Actuator endpoint,
 production safety guard, dry-run mode.
 
+### [01.01.00] — 2026-04-14 — Test coverage + Spring Boot 3.x compatibility
+Full unit and integration test suite for all previously untested components. Spring Boot 3.x support
+via dual-filter strategy (javax/jakarta). Configurable HTTP fault response body, library+version
+Micrometer tags, and `@InjectChaos` support on Spring `@Component` interfaces.
+
 ---
 
 ## In Progress
@@ -35,32 +40,6 @@ Fixes identified during open-source readiness audit. No API or config changes.
 ---
 
 ## Planned
-
-### [01.01.00] — Minor — Test coverage + Spring Boot 3.x compatibility
-**Target: ~2 weeks**
-
-These gaps exist today and directly affect confidence in the library for new adopters.
-
-#### Test coverage (none of these have tests today)
-- [ ] `ChaosHttpFaultFilter` — unit tests for path matching, latency injection, error status injection
-- [ ] `ChaosEndpoint` — actuator endpoint tests: GET status, POST dry-run toggle, event history
-- [ ] `ChaosMetricsRecorder` — verify Micrometer counters are emitted with correct tags
-- [ ] `ChaosEventStore` — ring-buffer eviction: fill past capacity, assert oldest events dropped
-- [ ] `CpuStressStrategy` — verifies background threads start and terminate within declared duration
-- [ ] `MemoryPressureStrategy` — verifies allocation does not exceed 25% heap cap
-- [ ] `ConnectionPoolExhaustionStrategy` — verifies connections are always released (even on exception)
-
-#### Spring Boot 3.x servlet namespace
-- [ ] `ChaosHttpFaultFilter` uses `javax.servlet.*` — Spring Boot 3.x uses `jakarta.servlet.*`
-- [ ] Auto-detect which namespace is on the classpath and register the correct filter class
-- [ ] Add a Spring Boot 3.x integration test in CI matrix
-
-#### Small improvements
-- [ ] Configurable HTTP fault response body (today hardcoded to `"[HavocFlow] HTTP fault injected"`)
-- [ ] `@InjectChaos` on Spring `@Component` interfaces (today only concrete bean proxies work)
-- [ ] Add `library` and `version` tags to all Micrometer metrics for multi-library dashboards
-
----
 
 ### [01.02.00] — Minor — Developer ergonomics
 **Target: ~4 weeks after 01.01.00**

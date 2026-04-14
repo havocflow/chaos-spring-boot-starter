@@ -10,6 +10,7 @@ import io.havocflow.gremlins.MemoryPressureStrategy;
 import io.havocflow.metrics.ChaosMetricsRecorder;
 import io.havocflow.spi.ChaosStrategy;
 import io.havocflow.web.ChaosHttpFaultFilter;
+import io.havocflow.web.ChaosHttpFaultFilterJakarta;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -129,13 +130,13 @@ public class ChaosAutoConfiguration {
     }
 
     /**
-     * Registers the HTTP fault injection filter when running in a web application.
-     * Only active when {@code chaos.http-fault.enabled=true}.
+     * Registers the HTTP fault injection filter for Spring Boot 2.x (javax.servlet).
+     * Only active when {@code javax.servlet.FilterChain} is on the classpath.
      */
     @Bean
-    @ConditionalOnMissingBean
+    @ConditionalOnMissingBean(name = "chaosHttpFaultFilter")
     @ConditionalOnWebApplication
-    @ConditionalOnClass(name = "org.springframework.web.filter.GenericFilterBean")
+    @ConditionalOnClass(name = "javax.servlet.FilterChain")
     public FilterRegistrationBean<ChaosHttpFaultFilter> chaosHttpFaultFilter(ChaosProperties properties) {
         ChaosHttpFaultFilter filter = new ChaosHttpFaultFilter(properties);
         FilterRegistrationBean<ChaosHttpFaultFilter> registration =
@@ -144,6 +145,24 @@ public class ChaosAutoConfiguration {
         registration.addUrlPatterns("/*");
         log.info("[HavocFlow] HTTP fault filter registered (active when chaos.http-fault.enabled=true)");
         return registration;
+    }
+
+    /**
+     * Registers the HTTP fault injection filter for Spring Boot 3.x (jakarta.servlet).
+     * Only active when {@code jakarta.servlet.FilterChain} is on the classpath.
+     *
+     * <p>Returned as a bare bean — Spring Boot 3.x auto-registers all {@code jakarta.servlet.Filter}
+     * beans for all URL patterns. We cannot use {@link FilterRegistrationBean} here because this
+     * library is compiled against Spring Boot 2.x where its type parameter is bounded to
+     * {@code javax.servlet.Filter}.
+     */
+    @Bean
+    @ConditionalOnMissingBean(name = "chaosHttpFaultFilterJakarta")
+    @ConditionalOnWebApplication
+    @ConditionalOnClass(name = "jakarta.servlet.FilterChain")
+    public ChaosHttpFaultFilterJakarta chaosHttpFaultFilterJakarta(ChaosProperties properties) {
+        log.info("[HavocFlow] HTTP fault filter (Jakarta) registered (active when chaos.http-fault.enabled=true)");
+        return new ChaosHttpFaultFilterJakarta(properties);
     }
 
     /**

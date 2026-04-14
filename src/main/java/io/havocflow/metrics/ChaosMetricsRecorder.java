@@ -20,6 +20,8 @@ import io.micrometer.core.instrument.MeterRegistry;
  */
 public class ChaosMetricsRecorder {
 
+    private static final String LIBRARY_VERSION = "01.01.00";
+
     private final MeterRegistry meterRegistry;
 
     /**
@@ -40,6 +42,8 @@ public class ChaosMetricsRecorder {
     public void recordGremlin(String methodName, ChaosDecision decision) {
         Counter.builder("chaos.gremlins.fired")
                 .description("Number of chaos gremlins fired by HavocFlow")
+                .tag("library", "havocflow")
+                .tag("version", LIBRARY_VERSION)
                 .tag("method", sanitize(methodName))
                 .tag("scenario", decision.getScenarioName())
                 .tag("mode", decision.getMode().name().toLowerCase())
@@ -49,6 +53,8 @@ public class ChaosMetricsRecorder {
         if (decision.getLatencyMillis() > 0) {
             Counter.builder("chaos.latency.injected.ms")
                     .description("Total artificial latency injected in milliseconds")
+                    .tag("library", "havocflow")
+                    .tag("version", LIBRARY_VERSION)
                     .tag("method", sanitize(methodName))
                     .register(meterRegistry)
                     .increment(decision.getLatencyMillis());

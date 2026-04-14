@@ -7,7 +7,7 @@
 
     <groupId>io.github.havocflow</groupId>
     <artifactId>chaos-spring-boot-starter</artifactId>
-    <version>01.00.00</version>
+    <version>01.01.00</version>
     <packaging>jar</packaging>
 
     <name>HavocFlow :: Chaos Spring Boot Starter</name>
@@ -43,7 +43,7 @@
         <connection>scm:git:git://github.com/havocflow/chaos-spring-boot-starter.git</connection>
         <developerConnection>scm:git:ssh://github.com/havocflow/chaos-spring-boot-starter.git</developerConnection>
         <url>https://github.com/havocflow/chaos-spring-boot-starter</url>
-        <tag>v01.00.00</tag>
+        <tag>v01.01.00</tag>
     </scm>
 
     <issueManagement>
@@ -129,6 +129,14 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Jakarta Servlet API: optional — compile-only for ChaosHttpFaultFilterJakarta (Spring Boot 3.x) -->
+        <dependency>
+            <groupId>jakarta.servlet</groupId>
+            <artifactId>jakarta.servlet-api</artifactId>
+            <version>6.0.0</version>
             <optional>true</optional>
         </dependency>
 
