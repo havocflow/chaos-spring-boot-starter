@@ -119,6 +119,45 @@
       "type": "java.lang.Long",
       "defaultValue": 1000,
       "description": "Duration in milliseconds to hold borrowed connections. Capped at min(5000, chaos.max-latency-millis). Connections are always released in a finally block."
+    },
+    {
+      "name": "chaos.kafka.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Apply chaos globally to all @KafkaListener methods when true. Requires spring-kafka on the classpath. Simulates consumer lag and processing failures."
+    },
+    {
+      "name": "chaos.kafka.latency",
+      "type": "java.lang.String",
+      "description": "Latency to inject before each @KafkaListener invocation. Supports same formats as @InjectChaos: '200ms', '1s', '100ms-500ms'. Capped at chaos.max-latency-millis."
+    },
+    {
+      "name": "chaos.kafka.failure-rate",
+      "type": "java.lang.Double",
+      "defaultValue": 0.0,
+      "description": "Probability (0.0–1.0) that a @KafkaListener invocation throws the configured exception."
+    },
+    {
+      "name": "chaos.kafka.exception",
+      "type": "java.lang.String",
+      "defaultValue": "java.lang.RuntimeException",
+      "description": "Fully-qualified exception class to throw when Kafka chaos fires. Must be a Throwable subclass."
+    },
+    {
+      "name": "chaos.notifications.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Enable asynchronous webhook/Slack notifications when gremlins fire. Requires chaos.notifications.webhook-url to be set."
+    },
+    {
+      "name": "chaos.notifications.webhook-url",
+      "type": "java.lang.String",
+      "description": "URL to POST a JSON payload to when a gremlin fires. Works with any HTTP webhook including Slack Incoming Webhooks. Required when chaos.notifications.enabled=true."
+    },
+    {
+      "name": "chaos.notifications.modes",
+      "type": "java.util.List<java.lang.String>",
+      "description": "Filter notifications by FailureMode name. An empty list notifies on all modes. Valid values: LATENCY, EXCEPTION, LATENCY_AND_EXCEPTION."
     }
   ]
 }

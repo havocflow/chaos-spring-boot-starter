@@ -9,6 +9,8 @@ import io.havocflow.core.ChaosEngine;
 import io.havocflow.core.FailureMode;
 import io.havocflow.event.ChaosEventStore;
 import io.havocflow.metrics.ChaosMetricsRecorder;
+import io.havocflow.notify.ChaosWebhookNotifier;
+import io.havocflow.otel.ChaosOtelSpanRecorder;
 import io.havocflow.spi.ChaosStrategy;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -44,6 +46,8 @@ public class ChaosAspect {
     private final Optional<ChaosEventStore> eventStore;
     private final Optional<ChaosAuditLogger> auditLogger;
     private final List<ChaosStrategy> strategies;
+    private final Optional<ChaosOtelSpanRecorder> otelRecorder;
+    private final Optional<ChaosWebhookNotifier> webhookNotifier;
 
     /**
      * Constructs a {@code ChaosAspect}.
@@ -52,20 +56,27 @@ public class ChaosAspect {
      * @param properties      the HavocFlow configuration; must not be {@code null}
      * @param metricsRecorder optional Micrometer recorder; empty when Micrometer is not on the classpath
      * @param eventStore      event store for injection history
+     * @param auditLogger     optional structured audit logger
      * @param strategies      list of registered {@link ChaosStrategy} plugins; may be empty
+     * @param otelRecorder    optional OpenTelemetry span event recorder
+     * @param webhookNotifier optional webhook/Slack notifier
      */
     public ChaosAspect(ChaosEngine engine,
                        ChaosProperties properties,
                        Optional<ChaosMetricsRecorder> metricsRecorder,
                        ChaosEventStore eventStore,
                        Optional<ChaosAuditLogger> auditLogger,
-                       List<ChaosStrategy> strategies) {
+                       List<ChaosStrategy> strategies,
+                       Optional<ChaosOtelSpanRecorder> otelRecorder,
+                       Optional<ChaosWebhookNotifier> webhookNotifier) {
         this.engine = engine;
         this.properties = properties;
         this.metricsRecorder = metricsRecorder;
         this.eventStore = Optional.ofNullable(eventStore);
         this.auditLogger = auditLogger != null ? auditLogger : Optional.<ChaosAuditLogger>empty();
         this.strategies = strategies != null ? strategies : Collections.<ChaosStrategy>emptyList();
+        this.otelRecorder = otelRecorder != null ? otelRecorder : Optional.<ChaosOtelSpanRecorder>empty();
+        this.webhookNotifier = webhookNotifier != null ? webhookNotifier : Optional.<ChaosWebhookNotifier>empty();
     }
 
     /**
@@ -172,6 +183,8 @@ public class ChaosAspect {
         metricsRecorder.ifPresent(r -> r.recordGremlin(methodName, decision));
         eventStore.ifPresent(s -> s.record(methodName, decision));
         auditLogger.ifPresent(a -> a.record(methodName, decision, Thread.currentThread().getName()));
+        otelRecorder.ifPresent(o -> o.record(methodName, decision));
+        webhookNotifier.ifPresent(n -> n.notifyAsync(methodName, decision));
 
         if (properties.isLogGremlins()) {
             log.warn("[HavocFlow] Gremlin fired — method={} mode={} scenario={} latency={}ms",

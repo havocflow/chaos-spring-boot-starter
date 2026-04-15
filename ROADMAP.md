@@ -30,6 +30,14 @@ on Spring `@Component` interfaces.
 `chaos.schedule.duration`). Structured append-only JSON-lines audit log. Security: `ThreadLocalRandom`
 in `LatencyParser`, pinned GitHub Action SHA, explicit workflow permissions.
 
+### [01.03.00] — 2026-04-15 — Ecosystem integrations
+Spring Kafka chaos: `ChaosKafkaAspect` applies chaos globally to all `@KafkaListener` methods
+(`chaos.kafka.*` config). OpenTelemetry span events: `ChaosOtelSpanRecorder` adds a
+`chaos.gremlin.fired` event to the active OTel span (zero-config, classpath-activated).
+Webhook/Slack notifications: `ChaosWebhookNotifier` POSTs async JSON payloads with mode filtering
+(`chaos.notifications.*`). Spring Cloud Gateway filter: `ChaosGatewayFilter` implements `GlobalFilter`
+for reactive fault injection reusing `chaos.http-fault.*` config.
+
 ---
 
 ## In Progress
@@ -48,36 +56,6 @@ Fixes identified during open-source readiness audit. No API or config changes.
 ---
 
 ## Planned
-
-### [01.03.00] — Minor — Ecosystem integrations
-**Target: ~6 weeks after 01.02.00**
-
-#### Spring Kafka chaos
-Apply `@InjectChaos` directly on `@KafkaListener` methods to simulate consumer lag and processing failures without touching application code:
-```java
-@KafkaListener(topics = "orders")
-@InjectChaos(latency = "500ms", failureRate = 0.05)
-public void onOrder(Order order) { ... }
-```
-
-#### OpenTelemetry span events
-When `opentelemetry-api` is on the classpath, add a span event for every gremlin fired.
-Chaos injections become visible in distributed traces with zero extra configuration.
-
-#### Webhook / Slack notifications
-POST a JSON payload to a configurable URL whenever a gremlin fires:
-```yaml
-chaos:
-  notifications:
-    webhook-url: https://hooks.slack.com/services/...
-    on-modes: [EXCEPTION, LATENCY_AND_EXCEPTION]   # filter by severity
-```
-
-#### Spring Cloud Gateway filter
-Register a `GatewayFilter` for fault injection at the API gateway level — inject faults before
-requests reach downstream services, enabling gateway-level resilience testing.
-
----
 
 ### [02.00.00] — Major — Reactive / WebFlux support
 **Breaking: requires Java 11+, new module**

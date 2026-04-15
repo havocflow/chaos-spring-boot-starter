@@ -7,7 +7,7 @@
 
     <groupId>io.github.havocflow</groupId>
     <artifactId>chaos-spring-boot-starter</artifactId>
-    <version>01.02.00</version>
+    <version>01.03.00</version>
     <packaging>jar</packaging>
 
     <name>HavocFlow :: Chaos Spring Boot Starter</name>
@@ -43,7 +43,7 @@
         <connection>scm:git:git://github.com/havocflow/chaos-spring-boot-starter.git</connection>
         <developerConnection>scm:git:ssh://github.com/havocflow/chaos-spring-boot-starter.git</developerConnection>
         <url>https://github.com/havocflow/chaos-spring-boot-starter</url>
-        <tag>v01.01.00</tag>
+        <tag>v01.03.00</tag>
     </scm>
 
     <issueManagement>
@@ -132,10 +132,55 @@
             <optional>true</optional>
         </dependency>
 
+        <!-- Spring Kafka: optional — ChaosKafkaAspect activated only when present -->
+        <dependency>
+            <groupId>org.springframework.kafka</groupId>
+            <artifactId>spring-kafka</artifactId>
+            <version>2.9.13</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- OpenTelemetry API: optional — span events recorded only when present -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-api</artifactId>
+            <version>1.38.0</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Spring Cloud Gateway: optional — ChaosGatewayFilter activated only when present -->
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+            <version>3.1.9</version>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Reactor Core: transitively pulled by SCG, declared for compilation clarity -->
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
         <!-- Test dependencies -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>io.projectreactor</groupId>
+            <artifactId>reactor-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+
+        <!-- OTel SDK testing: test scope only — needed to activate real spans in ChaosOtelSpanRecorderTest -->
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk-testing</artifactId>
+            <version>1.38.0</version>
             <scope>test</scope>
         </dependency>
 

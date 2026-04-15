@@ -460,4 +460,114 @@ public class ChaosProperties {
 
     public AuditLogProperties getAuditLog()               { return auditLog; }
     public void setAuditLog(AuditLogProperties auditLog)  { this.auditLog = auditLog; }
+
+    // -----------------------------------------------------------------------
+    // Kafka chaos configuration
+    // -----------------------------------------------------------------------
+
+    /**
+     * Configuration for Spring Kafka consumer chaos injection.
+     *
+     * <p>When enabled, chaos is applied globally to all {@code @KafkaListener} methods
+     * without requiring {@code @InjectChaos} on each listener.
+     *
+     * <pre>
+     * chaos:
+     *   kafka:
+     *     enabled: true
+     *     latency: "500ms"
+     *     failure-rate: 0.1
+     *     exception: org.springframework.kafka.KafkaException
+     * </pre>
+     */
+    public static class KafkaProperties {
+
+        /** Whether Kafka chaos injection is active. Default: {@code false}. */
+        private boolean enabled = false;
+
+        /**
+         * Latency to inject before each {@code @KafkaListener} invocation.
+         * Supports the same formats as {@code @InjectChaos(latency)}: e.g. {@code "200ms"}, {@code "1s-3s"}.
+         * Default: empty (no latency).
+         */
+        private String latency = "";
+
+        /** Probability (0.0–1.0) that an invocation throws the configured exception. Default: {@code 0.0}. */
+        private double failureRate = 0.0;
+
+        /**
+         * Fully-qualified name of the exception class to throw when failure fires.
+         * Default: {@code java.lang.RuntimeException}.
+         */
+        private String exception = "java.lang.RuntimeException";
+
+        public boolean isEnabled()          { return enabled; }
+        public void setEnabled(boolean v)   { this.enabled = v; }
+        public String getLatency()          { return latency; }
+        public void setLatency(String v)    { this.latency = v; }
+        public String getException()        { return exception; }
+        public void setException(String v)  { this.exception = v; }
+
+        public double getFailureRate() { return failureRate; }
+        public void setFailureRate(double v) {
+            if (v < 0.0 || v > 1.0) {
+                throw new IllegalArgumentException(
+                    "[HavocFlow] chaos.kafka.failure-rate must be between 0.0 and 1.0, got: " + v);
+            }
+            this.failureRate = v;
+        }
+    }
+
+    private KafkaProperties kafka = new KafkaProperties();
+
+    public KafkaProperties getKafka()               { return kafka; }
+    public void setKafka(KafkaProperties kafka)     { this.kafka = kafka; }
+
+    // -----------------------------------------------------------------------
+    // Notification (webhook/Slack) configuration
+    // -----------------------------------------------------------------------
+
+    /**
+     * Configuration for webhook and Slack notifications fired when a gremlin activates.
+     *
+     * <pre>
+     * chaos:
+     *   notifications:
+     *     enabled: true
+     *     webhook-url: https://hooks.slack.com/services/...
+     *     modes:
+     *       - EXCEPTION
+     *       - LATENCY_AND_EXCEPTION
+     * </pre>
+     */
+    public static class NotificationProperties {
+
+        /** Whether webhook notifications are active. Default: {@code false}. */
+        private boolean enabled = false;
+
+        /**
+         * Target URL for the JSON POST. Required when {@code enabled=true}.
+         * Works with any webhook endpoint including Slack Incoming Webhooks.
+         */
+        private String webhookUrl = "";
+
+        /**
+         * Filter: only send a notification when the fired {@link io.havocflow.core.FailureMode}
+         * name is in this list. An empty list means notify on ALL modes (except NONE).
+         * Valid values: {@code LATENCY}, {@code EXCEPTION}, {@code LATENCY_AND_EXCEPTION}.
+         */
+        private List<String> modes = new ArrayList<String>();
+
+        public boolean isEnabled()            { return enabled; }
+        public void setEnabled(boolean v)     { this.enabled = v; }
+        public String getWebhookUrl()         { return webhookUrl; }
+        public void setWebhookUrl(String v)   { this.webhookUrl = v; }
+        public List<String> getModes()        { return modes; }
+        public void setModes(List<String> v)  { this.modes = v; }
+    }
+
+    private NotificationProperties notifications = new NotificationProperties();
+
+    public NotificationProperties getNotifications()                    { return notifications; }
+    public void setNotifications(NotificationProperties notifications)  { this.notifications = notifications; }
 }

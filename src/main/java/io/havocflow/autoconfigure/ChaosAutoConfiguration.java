@@ -5,10 +5,14 @@ import io.havocflow.aop.ChaosAspect;
 import io.havocflow.audit.ChaosAuditLogger;
 import io.havocflow.core.ChaosEngine;
 import io.havocflow.event.ChaosEventStore;
+import io.havocflow.gateway.ChaosGatewayFilter;
 import io.havocflow.gremlins.ConnectionPoolExhaustionStrategy;
 import io.havocflow.gremlins.CpuStressStrategy;
 import io.havocflow.gremlins.MemoryPressureStrategy;
+import io.havocflow.kafka.ChaosKafkaAspect;
 import io.havocflow.metrics.ChaosMetricsRecorder;
+import io.havocflow.notify.ChaosWebhookNotifier;
+import io.havocflow.otel.ChaosOtelSpanRecorder;
 import io.havocflow.schedule.ChaosScheduler;
 import io.havocflow.spi.ChaosStrategy;
 import io.havocflow.web.ChaosHttpFaultFilter;
@@ -166,9 +170,65 @@ public class ChaosAutoConfiguration {
                                    Optional<ChaosMetricsRecorder> metricsRecorder,
                                    ChaosEventStore eventStore,
                                    Optional<ChaosAuditLogger> auditLogger,
-                                   List<ChaosStrategy> strategies) {
+                                   List<ChaosStrategy> strategies,
+                                   Optional<ChaosOtelSpanRecorder> otelRecorder,
+                                   Optional<ChaosWebhookNotifier> webhookNotifier) {
         return new ChaosAspect(engine, properties, metricsRecorder, eventStore, auditLogger,
-            strategies != null ? strategies : Collections.<ChaosStrategy>emptyList());
+            strategies != null ? strategies : Collections.<ChaosStrategy>emptyList(),
+            otelRecorder, webhookNotifier);
+    }
+
+    // -----------------------------------------------------------------------
+    // Ecosystem integration beans (01.03.00)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Registers {@link ChaosOtelSpanRecorder} when OpenTelemetry API is on the classpath.
+     * Zero-config: just add {@code opentelemetry-api} as a dependency.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(name = "io.opentelemetry.api.trace.Span")
+    public ChaosOtelSpanRecorder chaosOtelSpanRecorder() {
+        log.info("[HavocFlow] OpenTelemetry API detected — chaos span events will be recorded.");
+        return new ChaosOtelSpanRecorder();
+    }
+
+    /**
+     * Registers {@link ChaosWebhookNotifier} when {@code chaos.notifications.enabled=true}.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(prefix = "chaos.notifications", name = "enabled", havingValue = "true")
+    public ChaosWebhookNotifier chaosWebhookNotifier(ChaosProperties properties) {
+        log.info("[HavocFlow] Webhook notifier registered — url={}",
+            properties.getNotifications().getWebhookUrl());
+        return new ChaosWebhookNotifier(properties);
+    }
+
+    /**
+     * Registers {@link ChaosKafkaAspect} when Spring Kafka is on the classpath.
+     * Applies chaos to all {@code @KafkaListener} methods when {@code chaos.kafka.enabled=true}.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(name = "org.springframework.kafka.annotation.KafkaListener")
+    public ChaosKafkaAspect chaosKafkaAspect(ChaosProperties properties) {
+        log.info("[HavocFlow] Spring Kafka detected — ChaosKafkaAspect registered.");
+        return new ChaosKafkaAspect(properties);
+    }
+
+    /**
+     * Registers {@link ChaosGatewayFilter} when Spring Cloud Gateway is on the classpath.
+     * Reuses {@code chaos.http-fault.*} configuration for consistency with
+     * {@link ChaosHttpFaultFilter}.
+     */
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnClass(name = "org.springframework.cloud.gateway.filter.GlobalFilter")
+    public ChaosGatewayFilter chaosGatewayFilter(ChaosProperties properties) {
+        log.info("[HavocFlow] Spring Cloud Gateway detected — ChaosGatewayFilter registered.");
+        return new ChaosGatewayFilter(properties);
     }
 
     /**

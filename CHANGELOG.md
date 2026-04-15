@@ -20,6 +20,40 @@ _No unreleased changes yet._
 
 ---
 
+## [01.03.00] — 2026-04-15
+
+### Added
+
+**Spring Kafka chaos (`io.havocflow.kafka`)**
+- New `ChaosKafkaAspect` applies chaos globally to all `@KafkaListener` methods without requiring
+  `@InjectChaos` on each listener. Simulates consumer lag (latency) and processing failures (exceptions).
+- Activated when `spring-kafka` is on the classpath and `chaos.kafka.enabled=true`.
+- Config: `chaos.kafka.latency`, `chaos.kafka.failure-rate`, `chaos.kafka.exception`.
+- Respects the global `chaos.schedule.*` time window and `chaos.max-latency-millis` cap.
+
+**OpenTelemetry span events (`io.havocflow.otel`)**
+- New `ChaosOtelSpanRecorder` adds a `chaos.gremlin.fired` event to the current OTel span
+  every time a gremlin fires, making chaos injections visible in distributed traces.
+- Zero-config: just add `opentelemetry-api` to the classpath. No `chaos.otel.*` properties needed.
+- Span event attributes: `chaos.method`, `chaos.mode`, `chaos.scenario`, `chaos.latency_ms`.
+- Registered via `@ConditionalOnClass("io.opentelemetry.api.trace.Span")`. No-op when no span is active.
+
+**Webhook/Slack notifications (`io.havocflow.notify`)**
+- New `ChaosWebhookNotifier` POSTs a JSON payload to a configurable webhook URL when a gremlin fires.
+  Works with any HTTP webhook endpoint including Slack Incoming Webhooks.
+- Notifications are dispatched on a background daemon thread — never blocks the calling thread.
+- Config: `chaos.notifications.enabled`, `chaos.notifications.webhook-url`,
+  `chaos.notifications.modes` (filter by `FailureMode` name).
+- No new dependencies — uses `java.net.HttpURLConnection`. Implements `DisposableBean` for clean shutdown.
+
+**Spring Cloud Gateway filter (`io.havocflow.gateway`)**
+- New `ChaosGatewayFilter` implements `GlobalFilter` for reactive, non-blocking fault injection at
+  the API gateway level. Uses `Mono.delay()` instead of `Thread.sleep()`.
+- Reuses the existing `chaos.http-fault.*` configuration — no new properties required.
+- Registered via `@ConditionalOnClass("org.springframework.cloud.gateway.filter.GlobalFilter")`.
+
+---
+
 ## [01.02.00] — 2026-04-14
 
 ### Added
