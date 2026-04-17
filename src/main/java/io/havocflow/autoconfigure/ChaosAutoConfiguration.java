@@ -131,7 +131,7 @@ public class ChaosAutoConfiguration {
     @ConditionalOnMissingBean
     @ConditionalOnClass(name = "org.springframework.boot.actuate.endpoint.annotation.Endpoint")
     public ChaosEndpoint chaosEndpoint(ChaosProperties properties, ChaosEventStore eventStore) {
-        log.info("[HavocFlow] Actuator endpoint registered at /actuator/chaos");
+        log.info("[HavocFlow] Actuator endpoint registered at /actuator/chaos (spring-boot-actuator detected)");
         return new ChaosEndpoint(properties, eventStore);
     }
 

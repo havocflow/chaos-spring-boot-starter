@@ -7,7 +7,7 @@
 
     <groupId>io.github.havocflow</groupId>
     <artifactId>chaos-spring-boot-starter</artifactId>
-    <version>01.03.00</version>
+    <version>01.03.01</version>
     <packaging>jar</packaging>
 
     <name>HavocFlow :: Chaos Spring Boot Starter</name>
@@ -43,7 +43,7 @@
         <connection>scm:git:git://github.com/havocflow/chaos-spring-boot-starter.git</connection>
         <developerConnection>scm:git:ssh://github.com/havocflow/chaos-spring-boot-starter.git</developerConnection>
         <url>https://github.com/havocflow/chaos-spring-boot-starter</url>
-        <tag>v01.03.00</tag>
+        <tag>v01.03.01</tag>
     </scm>
 
     <issueManagement>
@@ -118,10 +118,14 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- Actuator: optional — /actuator/chaos endpoint registered only when present -->
+        <!-- Actuator annotations: optional — /actuator/chaos endpoint registered only when present.
+             Deliberately uses spring-boot-actuator (not spring-boot-starter-actuator) to exclude
+             spring-boot-actuator-autoconfigure, which contains CVE-2026-22733 (CloudFoundry
+             Actuator authentication bypass). ChaosEndpoint only needs @Endpoint / @ReadOperation /
+             @WriteOperation from spring-boot-actuator; the autoconfigure module is not required. -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-actuator</artifactId>
+            <artifactId>spring-boot-actuator</artifactId>
             <optional>true</optional>
         </dependency>
 

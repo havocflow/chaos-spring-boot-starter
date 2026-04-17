@@ -20,6 +20,25 @@ _No unreleased changes yet._
 
 ---
 
+## [01.03.01] — 2026-04-17
+
+### Security
+
+**CVE-2026-22733 — remove `spring-boot-actuator-autoconfigure` from dependency tree**
+- `spring-boot-starter-actuator` (optional build dependency) transitively pulled in
+  `spring-boot-actuator-autoconfigure`, which contains CVE-2026-22733 (CVSS 8.2 HIGH —
+  Authentication Bypass via CloudFoundry Actuator endpoints).
+- HavocFlow itself was never exploitable: `ChaosEndpoint` registers at `/actuator/chaos`,
+  not under CloudFoundry paths, and HavocFlow carries no Spring Security dependency.
+  However, security scanners correctly flag the vulnerable artifact as a direct dependency.
+- **Fix**: replaced `spring-boot-starter-actuator` (optional) with `spring-boot-actuator`
+  (optional) in `pom.xml`. `ChaosEndpoint` only requires `@Endpoint` / `@ReadOperation` /
+  `@WriteOperation` from `spring-boot-actuator`; the autoconfigure module was never needed.
+- `spring-boot-actuator-autoconfigure` is no longer present anywhere in HavocFlow's
+  dependency tree. Scanners will no longer flag this CVE against HavocFlow artifacts.
+
+---
+
 ## [01.03.00] — 2026-04-15
 
 ### Added
