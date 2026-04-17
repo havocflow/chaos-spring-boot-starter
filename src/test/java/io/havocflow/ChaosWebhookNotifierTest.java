@@ -45,7 +45,11 @@ class ChaosWebhookNotifierTest {
             public void handle(HttpExchange exchange) throws IOException {
                 receivedContentType.set(exchange.getRequestHeaders().getFirst("Content-Type"));
                 InputStream is = exchange.getRequestBody();
-                byte[] bytes = is.readAllBytes();
+                java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                byte[] buf = new byte[1024];
+                int n;
+                while ((n = is.read(buf)) != -1) { baos.write(buf, 0, n); }
+                byte[] bytes = baos.toByteArray();
                 receivedBody.set(new String(bytes, Charset.forName("UTF-8")));
                 exchange.sendResponseHeaders(200, -1);
                 exchange.close();
