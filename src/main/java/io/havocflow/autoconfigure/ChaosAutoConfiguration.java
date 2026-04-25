@@ -15,7 +15,9 @@ import io.havocflow.notify.ChaosWebhookNotifier;
 import io.havocflow.otel.ChaosOtelSpanRecorder;
 import io.havocflow.schedule.ChaosScheduler;
 import io.havocflow.spi.ChaosStrategy;
+import io.havocflow.test.ChaosContainerSupport;
 import io.havocflow.web.ChaosHttpFaultFilter;
+import io.havocflow.web.ChaosWebFilter;
 import org.springframework.scheduling.TaskScheduler;
 import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
@@ -23,6 +25,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -254,6 +257,56 @@ public class ChaosAutoConfiguration {
     public ChaosAuditLogger chaosAuditLogger(ChaosProperties properties) {
         log.info("[HavocFlow] Audit log enabled — path='{}'", properties.getAuditLog().getPath());
         return new ChaosAuditLogger(properties.getAuditLog().getPath());
+    }
+
+    // -----------------------------------------------------------------------
+    // New features — 01.04.00
+    // -----------------------------------------------------------------------
+
+    /**
+     * Registers {@link ChaosWebFilter} for Spring WebFlux (reactive) applications.
+     *
+     * <p>Only activated when:
+     * <ul>
+     *   <li>{@code org.springframework.web.server.WebFilter} is on the classpath (WebFlux present), AND</li>
+     *   <li>Spring Cloud Gateway is <em>absent</em> — when SCG is present,
+     *       {@link ChaosGatewayFilter} handles reactive fault injection to prevent double-injection, AND</li>
+     *   <li>The application is a reactive web application.</li>
+     * </ul>
+     * Faults are only injected when {@code chaos.http-fault.enabled=true}.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ChaosWebFilter.class)
+    @ConditionalOnClass(name = "org.springframework.web.server.WebFilter")
+    @ConditionalOnMissingClass("org.springframework.cloud.gateway.filter.GlobalFilter")
+    @ConditionalOnWebApplication(type = ConditionalOnWebApplication.Type.REACTIVE)
+    public ChaosWebFilter chaosWebFilter(ChaosProperties properties) {
+        log.info("[HavocFlow] WebFlux detected — ChaosWebFilter registered (active when chaos.http-fault.enabled=true)");
+        return new ChaosWebFilter(properties);
+    }
+
+    /**
+     * Registers the {@link ExperimentTemplateLoader} that merges five built-in scenario
+     * presets into {@link ChaosProperties#getScenarios()} at startup.
+     * User-defined scenarios always win — templates are only added when the key is absent.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ExperimentTemplateLoader.class)
+    public ExperimentTemplateLoader experimentTemplateLoader(ChaosProperties properties) {
+        log.info("[HavocFlow] ExperimentTemplateLoader registered — built-in experiment templates available");
+        return new ExperimentTemplateLoader(properties);
+    }
+
+    /**
+     * Registers a {@link ChaosContainerSupport} singleton when Testcontainers is on the classpath.
+     * Provides lifecycle-aware chaos scenario activation tied to container start/stop.
+     */
+    @Bean
+    @ConditionalOnMissingBean(ChaosContainerSupport.class)
+    @ConditionalOnClass(name = "org.testcontainers.containers.GenericContainer")
+    public ChaosContainerSupport chaosContainerSupport() {
+        log.info("[HavocFlow] Testcontainers detected — ChaosContainerSupport available.");
+        return new ChaosContainerSupport();
     }
 
     // -----------------------------------------------------------------------

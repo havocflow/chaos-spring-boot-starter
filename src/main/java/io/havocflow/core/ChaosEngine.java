@@ -94,16 +94,26 @@ public class ChaosEngine {
             return ChaosDecision.none();
         }
 
+        // Respect per-scenario active flag (used by ChaosContainerSupport lifecycle hooks)
+        if (!scenario.isActive()) {
+            return ChaosDecision.none();
+        }
+
         // Inline latency overrides scenario latency only when overridable=true and explicitly set
         String latencyExpr = (inlineOverride != null && !inlineOverride.latency().trim().isEmpty())
                 ? inlineOverride.latency()
                 : scenario.getLatency();
         long latencyMillis = capLatency(LatencyParser.parseMillis(latencyExpr));
 
-        // Inline failureRate overrides scenario failureRate only when overridable=true and > 0
+        // Inline failureRate overrides scenario failureRate only when overridable=true and > 0.
+        // When ramp-up is enabled, the base rate is linearly interpolated rather than static.
+        ChaosProperties.ScenarioProperties.RampUpProperties rampUp = scenario.getRampUp();
+        double baseRate = (rampUp != null && rampUp.isEnabled())
+                ? RampUpCalculator.computeCurrentRate(rampUp, System.currentTimeMillis())
+                : scenario.getFailureRate();
         double rate = (inlineOverride != null && inlineOverride.failureRate() > 0)
                 ? inlineOverride.failureRate()
-                : scenario.getFailureRate();
+                : baseRate;
         boolean shouldFail = ThreadLocalRandom.current().nextDouble() < rate;
 
         // Inline exception overrides scenario exception only when overridable=true and not the default
@@ -214,6 +224,7 @@ public class ChaosEngine {
         String defaultEx = "java.lang.RuntimeException";
         merged.setException(!child.getException().equals(defaultEx) ? child.getException() : base.getException());
         merged.setStrategy(!child.getStrategy().trim().isEmpty() ? child.getStrategy() : base.getStrategy());
+        merged.setRampUp(child.getRampUp().isEnabled() ? child.getRampUp() : base.getRampUp());
         return merged;
     }
 

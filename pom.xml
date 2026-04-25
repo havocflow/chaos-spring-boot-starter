@@ -7,7 +7,7 @@
 
     <groupId>io.github.havocflow</groupId>
     <artifactId>chaos-spring-boot-starter</artifactId>
-    <version>01.03.01</version>
+    <version>01.04.01</version>
     <packaging>jar</packaging>
 
     <name>HavocFlow :: Chaos Spring Boot Starter</name>
@@ -43,7 +43,7 @@
         <connection>scm:git:git://github.com/havocflow/chaos-spring-boot-starter.git</connection>
         <developerConnection>scm:git:ssh://github.com/havocflow/chaos-spring-boot-starter.git</developerConnection>
         <url>https://github.com/havocflow/chaos-spring-boot-starter</url>
-        <tag>v01.03.01</tag>
+        <tag>v01.04.01</tag>
     </scm>
 
     <issueManagement>
@@ -164,6 +164,24 @@
         <dependency>
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-core</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Spring WebFlux: optional — ChaosWebFilter activated only when WebFilter is present.
+             Using spring-webflux (not spring-boot-starter-webflux) to avoid pulling in Netty.
+             Version managed by the Spring Boot 2.7.18 BOM. -->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webflux</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- Testcontainers: optional — ChaosContainerSupport activated only when GenericContainer present.
+             Declared with explicit version since it is not covered by the Spring Boot BOM. -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <version>1.19.7</version>
             <optional>true</optional>
         </dependency>
 

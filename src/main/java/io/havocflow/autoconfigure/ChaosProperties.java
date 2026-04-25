@@ -3,9 +3,9 @@ package io.havocflow.autoconfigure;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * All HavocFlow configuration, bound from {@code application.yml} under the {@code chaos} prefix.
@@ -74,7 +74,7 @@ public class ChaosProperties {
     private int eventStoreCapacity = 100;
 
     /** Named scenario definitions. Key = scenario name used in {@code @InjectChaos(scenario=...)}. */
-    private Map<String, ScenarioProperties> scenarios = new HashMap<String, ScenarioProperties>();
+    private Map<String, ScenarioProperties> scenarios = new ConcurrentHashMap<String, ScenarioProperties>();
 
     // -----------------------------------------------------------------------
     // Getters / Setters
@@ -247,6 +247,91 @@ public class ChaosProperties {
 
         public String getExtendsScenario() { return extendsScenario; }
         public void setExtendsScenario(String extendsScenario) { this.extendsScenario = extendsScenario; }
+
+        /**
+         * Runtime flag for lifecycle-aware chaos activation (e.g. via {@link io.havocflow.test.ChaosContainerSupport}).
+         * When {@code false}, this scenario does not inject any chaos regardless of its configured rates.
+         * Defaults to {@code true} — scenarios are active unless explicitly toggled off.
+         * Declared {@code volatile} for cross-thread visibility.
+         */
+        private volatile boolean active = true;
+
+        public boolean isActive()           { return active; }
+        public void setActive(boolean active) { this.active = active; }
+
+        /**
+         * Configuration for gradual fault probability ramp-up.
+         *
+         * <p>When enabled, the effective {@code failureRate} is linearly interpolated from
+         * {@code startFailureRate} to {@code endFailureRate} over the configured {@code duration}.
+         * The ramp clock starts on the first invocation of the scenario.
+         *
+         * <pre>
+         * chaos:
+         *   scenarios:
+         *     my-scenario:
+         *       latency: "200ms"
+         *       ramp-up:
+         *         enabled: true
+         *         duration: "10m"
+         *         start-failure-rate: 0.0
+         *         end-failure-rate: 0.5
+         * </pre>
+         */
+        public static class RampUpProperties {
+
+            /** Whether fault ramp-up is active for this scenario. Default: {@code false}. */
+            private boolean enabled = false;
+
+            /**
+             * Duration over which to ramp from {@code startFailureRate} to {@code endFailureRate}.
+             * Supports the same formats as {@code @InjectChaos(latency)}: e.g. {@code "10m"}, {@code "30s"}.
+             * Default: {@code "10m"}.
+             */
+            private String duration = "10m";
+
+            /** Failure rate at the start of the ramp (t=0). Range: 0.0–1.0. Default: {@code 0.0}. */
+            private double startFailureRate = 0.0;
+
+            /** Failure rate at the end of the ramp (t=duration). Range: 0.0–1.0. Default: {@code 1.0}. */
+            private double endFailureRate = 1.0;
+
+            /**
+             * Epoch-millisecond timestamp of the first invocation.
+             * Set lazily by {@link io.havocflow.core.RampUpCalculator} on the first call.
+             * Not a configuration property — not bound from {@code application.yml}.
+             * Declared {@code volatile} for cross-thread visibility (benign single-write race).
+             */
+            private volatile long startTimeMillis = -1L;
+
+            public boolean isEnabled()              { return enabled; }
+            public void setEnabled(boolean v)       { this.enabled = v; }
+            public String getDuration()             { return duration; }
+            public void setDuration(String v)       { this.duration = v; }
+            public double getStartFailureRate()     { return startFailureRate; }
+            public void setStartFailureRate(double v) {
+                if (v < 0.0 || v > 1.0) {
+                    throw new IllegalArgumentException(
+                        "[HavocFlow] ramp-up startFailureRate must be between 0.0 and 1.0, got: " + v);
+                }
+                this.startFailureRate = v;
+            }
+            public double getEndFailureRate()       { return endFailureRate; }
+            public void setEndFailureRate(double v) {
+                if (v < 0.0 || v > 1.0) {
+                    throw new IllegalArgumentException(
+                        "[HavocFlow] ramp-up endFailureRate must be between 0.0 and 1.0, got: " + v);
+                }
+                this.endFailureRate = v;
+            }
+            public long getStartTimeMillis()        { return startTimeMillis; }
+            public void setStartTimeMillis(long v)  { this.startTimeMillis = v; }
+        }
+
+        private RampUpProperties rampUp = new RampUpProperties();
+
+        public RampUpProperties getRampUp()              { return rampUp; }
+        public void setRampUp(RampUpProperties rampUp)   { this.rampUp = rampUp; }
     }
 
     // -----------------------------------------------------------------------
@@ -570,4 +655,41 @@ public class ChaosProperties {
 
     public NotificationProperties getNotifications()                    { return notifications; }
     public void setNotifications(NotificationProperties notifications)  { this.notifications = notifications; }
+
+    // -----------------------------------------------------------------------
+    // Runtime lifecycle helpers (01.04.00)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Temporarily activates the named scenario for the given duration, then deactivates it.
+     *
+     * <p>If the scenario is not found, this method is a no-op.
+     * Activation and deactivation are driven by {@link ScenarioProperties#setActive(boolean)}.
+     * The restore runs on a background daemon thread so the calling thread is not blocked.
+     *
+     * <p>Primary use case: {@link io.havocflow.test.ChaosContainerSupport} ties chaos lifecycle
+     * to Testcontainers container start/stop events.
+     *
+     * @param name            the scenario name as defined in {@code chaos.scenarios.*}
+     * @param durationSeconds how many seconds to hold the activated state before reverting
+     */
+    public void activateScenario(final String name, final int durationSeconds) {
+        final ScenarioProperties scenario = scenarios.get(name);
+        if (scenario == null) {
+            return;
+        }
+        scenario.setActive(true);
+        Thread restorer = new Thread(new Runnable() {
+            public void run() {
+                try {
+                    Thread.sleep(durationSeconds * 1000L);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                scenario.setActive(false);
+            }
+        }, "havocflow-scenario-restorer");
+        restorer.setDaemon(true);
+        restorer.start();
+    }
 }

@@ -20,6 +20,72 @@ _No unreleased changes yet._
 
 ---
 
+## [01.04.01] — 2026-04-25
+
+### Security / Fixed
+
+- **`ChaosProperties`**: `scenarios` map changed from `HashMap` to `ConcurrentHashMap` — eliminates
+  a potential `ConcurrentModificationException` when the `activateScenario()` daemon thread races
+  with request threads iterating the map inside `ChaosEngine.resolveFromScenario()`.
+- **`ChaosProperties.RampUpProperties`**: added range validation (0.0–1.0) on
+  `setStartFailureRate()` and `setEndFailureRate()`, matching the guard already present on every
+  other rate setter in the class. Out-of-range values now throw `IllegalArgumentException` at
+  configuration-bind time rather than being silently clamped at runtime.
+- **`ExperimentTemplateLoader.builtInTemplateNames()`**: now returns
+  `Collections.unmodifiableList(...)` instead of a mutable `ArrayList`, preventing callers from
+  accidentally mutating the list.
+
+---
+
+## [01.04.00] — 2026-04-25
+
+### Added
+
+**Spring WebFlux reactive HTTP fault injection (`io.havocflow.web.ChaosWebFilter`)**
+- New `ChaosWebFilter` implementing `WebFilter` — the non-blocking equivalent of
+  `ChaosHttpFaultFilter` for Spring WebFlux applications.
+- Uses `Mono.delay(Duration)` for latency (never blocks the event loop) and
+  `exchange.getResponse().setComplete()` for short-circuit fault responses.
+- Reuses the existing `chaos.http-fault.*` configuration namespace — no new properties required.
+- Registered via `@ConditionalOnClass("org.springframework.web.server.WebFilter")` and
+  `@ConditionalOnWebApplication(type=REACTIVE)`. Suppressed when Spring Cloud Gateway is
+  present (`ChaosGatewayFilter` handles reactive fault injection in that case).
+- New optional compile dependency: `spring-webflux` (no Netty pulled in).
+- Test: `ChaosWebFilterTest` using `MockServerWebExchange` + `StepVerifier.withVirtualTime()`.
+
+**Fault Ramp-Up — gradual probability increase (`io.havocflow.core.RampUpCalculator`)**
+- New `RampUpProperties` nested class inside `ScenarioProperties` adds four config fields:
+  `enabled`, `duration`, `start-failure-rate`, `end-failure-rate`.
+- New `RampUpCalculator` utility computes the linearly interpolated failure rate given elapsed time.
+  The ramp clock starts lazily on the first invocation of the scenario.
+- `ChaosEngine` uses the interpolated rate instead of the static `failureRate` when
+  `ramp-up.enabled=true` on a scenario, unless an inline `@InjectChaos` override is active.
+- Config path: `chaos.scenarios.<name>.ramp-up.enabled`, `...duration`, `...start-failure-rate`,
+  `...end-failure-rate`.
+- Test: `RampUpCalculatorTest` with exact time boundary assertions.
+
+**Experiment Templates — pre-built scenario presets (`io.havocflow.autoconfigure.ExperimentTemplateLoader`)**
+- New `ExperimentTemplateLoader` implementing `SmartInitializingSingleton` merges five built-in
+  scenario presets into `ChaosProperties.scenarios` at startup. User-defined scenarios always win.
+- Built-in templates: `golden-signal-degradation`, `database-timeout`, `network-partition`,
+  `cascading-failure`, `cache-miss-storm`. Each is a pre-configured `ScenarioProperties`.
+- `GET /actuator/chaos` response now includes a `builtInTemplates` field listing available template names.
+- Test: `ExperimentTemplateLoaderTest`.
+
+**Testcontainers Integration (`io.havocflow.test.ChaosContainerSupport`)**
+- New `ChaosContainerSupport` utility with static factory method
+  `withScenario(GenericContainer, ChaosProperties, String)` — wraps a container to
+  activate a chaos scenario when the container starts and deactivate it when it stops.
+- New `ScenarioProperties.active` volatile boolean flag controls per-scenario on/off state.
+  `ChaosEngine.resolveFromScenario()` short-circuits to `NONE` when `active=false`.
+- New `ChaosProperties.activateScenario(String, int)` utility: temporarily activates a
+  scenario for a fixed duration on a background daemon thread.
+- New optional dependency: `org.testcontainers:testcontainers:1.19.7`.
+- Registered via `@ConditionalOnClass("org.testcontainers.containers.GenericContainer")`.
+- Test: `ChaosContainerSupportTest` (uses Mockito mock — no Docker required).
+
+---
+
 ## [01.03.01] — 2026-04-17
 
 ### Security

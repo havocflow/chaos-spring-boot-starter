@@ -158,6 +158,30 @@
       "name": "chaos.notifications.modes",
       "type": "java.util.List<java.lang.String>",
       "description": "Filter notifications by FailureMode name. An empty list notifies on all modes. Valid values: LATENCY, EXCEPTION, LATENCY_AND_EXCEPTION."
+    },
+    {
+      "name": "chaos.scenarios.ramp-up.enabled",
+      "type": "java.lang.Boolean",
+      "defaultValue": false,
+      "description": "Enable gradual fault probability ramp-up for this scenario. When true, failureRate is linearly interpolated from startFailureRate to endFailureRate over the configured duration."
+    },
+    {
+      "name": "chaos.scenarios.ramp-up.duration",
+      "type": "java.lang.String",
+      "defaultValue": "10m",
+      "description": "Duration of the ramp-up period. Supports the same formats as @InjectChaos latency: '10m', '30s', '2m30s'. The ramp clock starts on the first invocation."
+    },
+    {
+      "name": "chaos.scenarios.ramp-up.start-failure-rate",
+      "type": "java.lang.Double",
+      "defaultValue": 0.0,
+      "description": "Failure rate at the start of the ramp-up (t=0). Range: 0.0–1.0."
+    },
+    {
+      "name": "chaos.scenarios.ramp-up.end-failure-rate",
+      "type": "java.lang.Double",
+      "defaultValue": 1.0,
+      "description": "Failure rate at the end of the ramp-up period (t=duration). Range: 0.0–1.0."
     }
   ]
 }

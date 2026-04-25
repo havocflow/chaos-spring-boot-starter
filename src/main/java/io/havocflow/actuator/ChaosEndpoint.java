@@ -1,6 +1,7 @@
 package io.havocflow.actuator;
 
 import io.havocflow.autoconfigure.ChaosProperties;
+import io.havocflow.autoconfigure.ExperimentTemplateLoader;
 import io.havocflow.event.ChaosEventStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,7 +61,8 @@ public class ChaosEndpoint {
             properties.getDefaultFailureRate(),
             properties.getMaxLatencyMillis(),
             scenarioSummary,
-            eventStore.getRecentEvents()
+            eventStore.getRecentEvents(),
+            ExperimentTemplateLoader.builtInTemplateNames()
         );
     }
 
