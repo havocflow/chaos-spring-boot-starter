@@ -20,6 +20,67 @@ _No unreleased changes yet._
 
 ---
 
+## [01.04.03] — 2026-07-26
+
+### Security
+
+**CVE — Spring Kafka `DelegatingDeserializer` heap-DoS (unbounded selector cache)**
+- `spring-kafka` versions 4.0.0–4.0.5, 3.3.0–3.3.15, 3.2.0–3.2.13, 2.9.0–2.9.13, and
+  2.8.0–2.8.11 contain a heap-DoS vulnerability: `DelegatingDeserializer` caches delegate
+  deserializer instances in an **unbounded** `HashMap` keyed by the
+  `spring.kafka.serialization.selector` Kafka record header. A malicious producer can send
+  records with unique random header values, growing the cache without bound →
+  GC thrash → `OutOfMemoryError`.
+- HavocFlow's `ChaosKafkaAspect` does not use `DelegatingDeserializer` and is not directly
+  exploitable via this vector. However, HavocFlow users who configure `DelegatingDeserializer`
+  in their own consumer factories are affected when running a vulnerable spring-kafka version.
+- **Fix**: new `io.havocflow.kafka.BoundedDelegatingDeserializer<T>` — a drop-in replacement
+  with two layered defences:
+  - **Bounded LRU cache** (`havocflow.bdd.max-cache-size`, default 100): backed by a
+    `LinkedHashMap` with `removeEldestEntry`; evicts and closes the LRU delegate when full,
+    preventing unbounded heap growth regardless of selector cardinality.
+  - **Allowlist enforcement** (`havocflow.bdd.selector-class-map`): unknown selectors are
+    rejected with `IllegalArgumentException` immediately — deny-by-default posture prevents
+    arbitrary class loading from untrusted header values.
+  - Thread-safe; no Spring beans required; configured via standard `ConsumerFactory` properties.
+  - Handles both value (`spring.kafka.serialization.selector`) and key
+    (`spring.kafka.key.serialization.selector`) routing headers.
+  - To migrate: replace `org.springframework.kafka.support.serializer.DelegatingDeserializer`
+    with `io.havocflow.kafka.BoundedDelegatingDeserializer` in your consumer factory and
+    populate `havocflow.bdd.selector-class-map` with the allowed selector → class mappings.
+
+---
+
+## [01.04.02] — 2026-07-26
+
+### Security
+
+**Advisory — Spring Kafka header-mapper trusted-package deserialization**
+- `spring-kafka:2.9.13` (optional dependency) is within the affected range of a
+  Spring for Apache Kafka vulnerability where `JsonKafkaHeaderMapper` and the deprecated
+  `DefaultKafkaHeaderMapper` matched type headers using a simple prefix check, allowing any
+  sub-package of a trusted package to pass the guard. Combined with Jackson's default bean
+  deserialization, a crafted producer could supply header values that caused the consumer to
+  deserialize arbitrary JDK types.
+- HavocFlow's `ChaosKafkaAspect` does not configure or invoke header mappers — it intercepts
+  `@KafkaListener` methods via AOP only. HavocFlow itself is not exploitable via this vector.
+  However, security scanners may flag `spring-kafka:2.9.13` as a vulnerable direct dependency.
+- **No patch available for the 2.9.x line.** The fix was released in spring-kafka 3.x. HavocFlow
+  targets Java 8 / Spring Boot 2.7.x and cannot move to 3.x. `2.9.13` is the final 2.9.x release.
+  Users who configure `JsonKafkaHeaderMapper` or `DefaultKafkaHeaderMapper` in their own consumer
+  factories should migrate to spring-kafka 3.x or restrict the trusted-packages list explicitly.
+
+**Dependabot — OpenTelemetry unbounded baggage parsing (W3C / Jaeger / OtTrace propagators)**
+- `opentelemetry-api:1.38.0` (optional dependency) is within the affected range: `W3CBaggagePropagator`,
+  `JaegerPropagator`, and `OtTracePropagator` enforced no limit on baggage header size or entry count,
+  enabling unbounded memory allocation and CPU consumption that can propagate to downstream services.
+- HavocFlow does not use baggage propagation — the OTel integration only records `chaos.gremlin.fired`
+  span events. HavocFlow itself is not exploitable via this vector.
+  However, security scanners flag `opentelemetry-api:1.38.0` as a vulnerable direct dependency.
+- **Fix**: bumped optional `opentelemetry-api` and test `opentelemetry-sdk-testing` from `1.38.0` to `1.62.0`.
+
+---
+
 ## [01.04.01] — 2026-04-25
 
 ### Security / Fixed
@@ -245,5 +306,7 @@ _No unreleased changes yet._
 - Java 8 through Java 21
 - `spring.factories` + `AutoConfiguration.imports` dual registration
 
+[01.04.03]: https://github.com/havocflow/chaos-spring-boot-starter/compare/v01.04.02...v01.04.03
+[01.04.02]: https://github.com/havocflow/chaos-spring-boot-starter/compare/v01.04.01...v01.04.02
 [01.00.01]: https://github.com/havocflow/chaos-spring-boot-starter/compare/v01.00.00...HEAD
 [01.00.00]: https://github.com/havocflow/chaos-spring-boot-starter/releases/tag/v01.00.00

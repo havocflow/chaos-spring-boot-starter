@@ -7,7 +7,7 @@
 
     <groupId>io.github.havocflow</groupId>
     <artifactId>chaos-spring-boot-starter</artifactId>
-    <version>01.04.01</version>
+    <version>01.04.02</version>
     <packaging>jar</packaging>
 
     <name>HavocFlow :: Chaos Spring Boot Starter</name>
@@ -43,7 +43,7 @@
         <connection>scm:git:git://github.com/havocflow/chaos-spring-boot-starter.git</connection>
         <developerConnection>scm:git:ssh://github.com/havocflow/chaos-spring-boot-starter.git</developerConnection>
         <url>https://github.com/havocflow/chaos-spring-boot-starter</url>
-        <tag>v01.04.01</tag>
+        <tag>v01.04.02</tag>
     </scm>
 
     <issueManagement>
@@ -148,7 +148,7 @@
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-api</artifactId>
-            <version>1.38.0</version>
+            <version>1.62.0</version>
             <optional>true</optional>
         </dependency>
 
@@ -202,7 +202,7 @@
         <dependency>
             <groupId>io.opentelemetry</groupId>
             <artifactId>opentelemetry-sdk-testing</artifactId>
-            <version>1.38.0</version>
+            <version>1.62.0</version>
             <scope>test</scope>
         </dependency>
 
